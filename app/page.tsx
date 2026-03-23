@@ -1,721 +1,527 @@
-'use client';
+"use client";
 
-import {useState, useEffect, JSX} from 'react';
-import MegaMenu from "@/components/menu";
+import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 
-/* ── Navbar ──────────────────────────────────────────────────────── */
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 60);
-    window.addEventListener('scroll', fn);
-    return () => window.removeEventListener('scroll', fn);
-  }, []);
-
-  return (
-      <>
-        <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-10 h-[72px] transition-all duration-300 ${scrolled ? 'bg-[#091a38]/95 backdrop-blur-md shadow-lg' : ''}`}>
-          <div className="flex items-center gap-5">
-            <span className="text-white text-sm font-semibold border-b-2 border-[#e2b23e] pb-0.5 cursor-pointer">EN</span>
-            <span className="text-white/50 text-sm font-medium cursor-pointer hover:text-white transition-colors">FR</span>
-          </div>
-
-          <a href="#" className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center font-serif text-2xl font-bold text-[#06152e] flex-shrink-0" style={{ background: 'linear-gradient(135deg, #e2b23e, #b8860b)' }}>
-              A
-            </div>
-            <div>
-              <div className="font-serif text-[1.1rem] font-bold text-white leading-tight">Academia</div>
-              <div className="text-[0.6rem] tracking-widest uppercase text-white/40 font-medium">Collège Alpin International</div>
-            </div>
-          </a>
-
-          <div className="flex items-center gap-4">
-            <button className="border border-white/60 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2 rounded-full hover:bg-white hover:text-[#091a38] transition-all duration-200">
-              Enquire Now
-            </button>
-            <svg className="text-white/70" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-            </svg>
-            {/* Menu toggle button */}
-            <button
-                onClick={() => setMenuOpen(true)}
-                className="flex items-center gap-2 cursor-pointer group"
-                aria-label="Open menu"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="block w-5 h-[2px] bg-white/80 rounded group-hover:bg-white transition-colors"/>
-                <span className="block w-5 h-[2px] bg-white/80 rounded group-hover:bg-white transition-colors"/>
-                <span className="block w-5 h-[2px] bg-white/80 rounded group-hover:bg-white transition-colors"/>
-              </div>
-              <span className="text-white/60 text-[0.65rem] font-bold tracking-widest uppercase group-hover:text-white transition-colors">MENU</span>
-            </button>
-          </div>
-        </nav>
-
-        <MegaMenu isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
-      </>
-  );
-}
-
-/* ── Reusable: bottom explore tab bar ───────────────────────────── */
-type ExploreBarProps = {
-  active: string; // or whatever type it should be
+// ── All searchable content ──────────────────────────────────────────────────
+const menuData = {
+    Academic: [
+        "Introduction",
+        "Grades 6 to 10",
+        "Grades 11 and 12",
+        "Learning Support",
+        "Academic Results",
+        "Careers and University Guidance",
+        "Unique Collaborations",
+        "Global Campus",
+    ],
+    Boarding: [
+        "Introduction",
+        "Daily Life at Beau Soleil",
+        "Weekends",
+        "Our Boarding Houses",
+        "Boarding House Team",
+        "Health and Wellbeing",
+        "High Expectations",
+    ],
+    "Co-curricular": [
+        "Introduction",
+        "The Hub",
+        "School Challenges",
+        "Creative and Performing Arts",
+        { label: "Sports", hasArrow: true },
+        "Outdoor Education",
+        "Trips",
+        { label: "Clubs and Activities", hasArrow: true },
+    ],
+    "About Us": [
+        "Our Heritage",
+        "Our Senior Leadership Team",
+        "Nord Anglia Education",
+        "The Good Schools Guide",
+        "News and Events",
+        "Careers",
+        "Term Dates",
+        "Contact Us",
+    ],
 };
 
-function ExploreBar({ active }: ExploreBarProps): JSX.Element {
-  const tabs = ['Home', 'Academic', 'Boarding', 'Co-Curricular'];
-  return (
-      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center gap-4 px-12 py-5" style={{ background: 'rgba(9,26,56,0.85)', backdropFilter: 'blur(8px)', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-        <span className="text-white/50 text-[0.62rem] font-bold tracking-widest uppercase flex-shrink-0 mr-2">Explore</span>
-        {tabs.map((tab, i) => (
-            <div key={tab} className="flex items-center gap-4 flex-1">
-              <button className={`px-5 py-2 rounded-full text-[0.8125rem] font-semibold whitespace-nowrap flex-shrink-0 transition-all duration-200 ${active === tab ? 'bg-white text-[#091a38]' : 'border border-white/30 text-white/65 hover:text-white hover:border-white/60'}`}>
-                {tab}
-              </button>
-              {i < tabs.length - 1 && <div className="flex-1 h-px bg-white/20"/>}
-            </div>
-        ))}
-      </div>
-  );
+// Flat list of all pages for search
+const allPages: { title: string; section: string; description: string }[] = [
+    ...Object.entries(menuData).flatMap(([section, items]) =>
+        items.map((item) => ({
+            title: typeof item === "string" ? item : item.label,
+            section,
+            description: `${section} — Beau Soleil Collège Alpin International`,
+        }))
+    ),
+    { title: "Admissions", section: "Admissions", description: "How to apply to Beau Soleil" },
+    { title: "Summer Camp", section: "Summer Camp", description: "Summer programmes at Beau Soleil" },
+    { title: "Legal Notice", section: "Legal", description: "Legal information" },
+    { title: "Privacy Policy", section: "Legal", description: "How we handle your data" },
+    { title: "Accessibility", section: "Legal", description: "Accessibility statement" },
+];
+
+const bottomLinks = ["About Us", "News and Events", "Admissions", "Summer Camp", "Contact Us"];
+const footerLeft = ["Careers", "Term Dates"];
+const footerRight = ["Legal Notice", "Privacy Policy", "Accessibility"];
+
+// ── Highlight matched text ──────────────────────────────────────────────────
+function Highlight({ text, query }: { text: string; query: string }) {
+    if (!query.trim()) return <>{text}</>;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return <>{text}</>;
+    return (
+        <>
+            {text.slice(0, idx)}
+            <mark style={{ background: "#d4a820", color: "#0d2245", borderRadius: "2px", padding: "0 2px" }}>
+                {text.slice(idx, idx + query.length)}
+            </mark>
+            {text.slice(idx + query.length)}
+        </>
+    );
 }
 
-/* ── Reusable: up/down arrows on slide right ────────────────────── */
-function SlideArrows() {
-  return (
-      <div className="absolute right-10 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-3">
-        <button className="w-10 h-10 rounded-full border border-white/40 text-white text-base flex items-center justify-center hover:bg-white/15 transition-all">↑</button>
-        <div className="w-8 h-px bg-white/30"/>
-        <button className="w-10 h-10 rounded-full border border-white/40 text-white text-base flex items-center justify-center hover:bg-white/15 transition-all">↓</button>
-      </div>
-  );
-}
+// ── Shield SVG (reused in multiple places) ─────────────────────────────────
+const LOGO_SRC = "/logo.png";
 
-/* ── Crest badge ────────────────────────────────────────────────── */
-function Crest({ size = 'md' }) {
-  const s = size === 'lg' ? 'w-16 h-16 text-3xl rounded-2xl' : 'w-14 h-14 text-2xl rounded-xl';
-  return (
-      <div className={`${s} flex items-center justify-center font-serif font-bold text-[#06152e] mx-auto`} style={{ background: 'linear-gradient(135deg, #e2b23e, #b8860b)' }}>
-        A
-      </div>
-  );
-}
+// ══════════════════════════════════════════════════════════════════════════════
+export default function BeauSoleilHome() {
+    const [activeLang, setActiveLang] = useState<"EN" | "FR">("EN");
+    const [activeNav, setActiveNav] = useState("HOME");
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 1 — HERO (Home slide)
-───────────────────────────────────────────────────────────────── */
-function HeroSection() {
-  return (
-      <section className="relative h-screen min-h-[640px] overflow-hidden">
-        {/* Alpine sky */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #b5cfe0 0%, #8ab5cc 20%, #5a8fb0 45%, #2a6080 70%, #0a2a40 100%)' }}/>
+    // Auto-focus input when search opens
+    useEffect(() => {
+        if (searchOpen) {
+            setTimeout(() => searchInputRef.current?.focus(), 80);
+        } else {
+            setQuery("");
+        }
+    }, [searchOpen]);
 
-        {/* Far mountain range */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(100,145,170,0.45) 0%, rgba(60,105,140,0.4) 100%)', clipPath: 'polygon(0% 100%, 6% 52%, 14% 68%, 22% 38%, 30% 58%, 38% 28%, 46% 50%, 54% 22%, 62% 48%, 70% 32%, 78% 56%, 86% 38%, 94% 54%, 100% 42%, 100% 100%)' }}/>
-        {/* Mid mountain */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(50,90,120,0.5) 0%, rgba(20,55,85,0.55) 100%)', clipPath: 'polygon(0% 100%, 4% 62%, 12% 74%, 20% 48%, 28% 66%, 36% 38%, 44% 60%, 52% 34%, 60% 56%, 68% 42%, 76% 64%, 84% 48%, 92% 66%, 100% 52%, 100% 100%)' }}/>
+    // Close on Escape
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setSearchOpen(false);
+                setMenuOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, []);
 
-        {/* School building */}
-        <div className="absolute bottom-[80px] left-1/2 -translate-x-1/2 w-[720px] max-w-[90vw]">
-          {/* Main wings */}
-          <div className="relative w-full h-64" style={{ background: 'linear-gradient(180deg, #dde9f2 0%, #c5d5e5 50%, #adc0d3 100%)' }}>
-            {/* Centre tower */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-44 h-72" style={{ background: 'linear-gradient(180deg, #d0e0ec 0%, #b8cad8 100%)' }}>
-              {/* Spire */}
-              <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-0 h-0" style={{ borderLeft: '34px solid transparent', borderRight: '34px solid transparent', borderBottom: '68px solid #8aaabb' }}/>
-              {/* Entrance arch */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-14 h-20 rounded-t-full" style={{ background: '#0e2550' }}/>
-              {/* Name */}
-              <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                <div className="font-serif text-[0.58rem] font-bold text-[#0c2044] tracking-wider">ACADEMIA</div>
-                <div className="text-[0.42rem] text-[#163470] tracking-widest mt-0.5">Collège Alpin International</div>
-              </div>
+    const navItems = ["HOME", "ACADEMIC", "BOARDING", "CO-CURRICULAR"];
+
+    // Filter results
+    const results = query.trim().length > 1
+        ? allPages.filter(
+            (p) =>
+                p.title.toLowerCase().includes(query.toLowerCase()) ||
+                p.section.toLowerCase().includes(query.toLowerCase())
+        )
+        : [];
+
+    const popular = ["Admissions", "Boarding", "Summer Camp", "Academic Results", "Contact Us", "Term Dates"];
+
+    return (
+        <main className="relative w-full h-screen overflow-hidden font-sans">
+
+            {/* ── BACKGROUND IMAGE ── */}
+            <Image
+                src="school_bg.jpg"
+                alt="Beau Soleil alpine campus"
+                fill priority unoptimized
+                style={{ objectFit: "cover", objectPosition: "center" }}
+            />
+            <div className="absolute inset-0 z-10" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, transparent 40%, rgba(0,0,0,0.48) 100%)" }} />
+            <div className="absolute inset-0 z-10" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.12), transparent, rgba(0,0,0,0.12))" }} />
+
+            {/* ── TOP LEFT: Language switcher ── */}
+            <div className="absolute top-6 left-7 z-20" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {(["EN", "FR"] as const).map((lang) => (
+                    <button key={lang} onClick={() => setActiveLang(lang)}
+                            style={{ background: "none", border: "none", borderBottom: activeLang === lang ? "2px solid #facc15" : "2px solid transparent", padding: "2px 2px 3px 2px", color: activeLang === lang ? "white" : "rgba(255,255,255,0.5)", fontSize: "11px", fontWeight: 700, letterSpacing: "0.15em", cursor: "pointer", transition: "all 0.2s" }}>
+                        {lang}
+                    </button>
+                ))}
             </div>
-            {/* Upper windows */}
-            <div className="absolute top-7 left-0 right-0 flex justify-around px-[190px]">
-              {[0,1,2,3].map(i => <div key={i} className="w-7 h-9 rounded-sm" style={{ background: 'rgba(100,160,200,0.4)', border: '2px solid rgba(160,190,210,0.5)' }}/>)}
-            </div>
-            {/* Arched ground openings */}
-            <div className="absolute bottom-0 left-0 right-0 flex justify-around px-[190px] items-end">
-              {[0,1,2,3].map(i => <div key={i} className="w-9 h-14 rounded-t-full" style={{ background: 'rgba(80,120,160,0.35)', border: '2px solid rgba(120,160,190,0.4)' }}/>)}
-            </div>
-          </div>
-          {/* Courtyard */}
-          <div className="h-16 flex items-center justify-center gap-6" style={{ background: 'linear-gradient(180deg, #3a5a6a, #1e3040)' }}>
-            {[38,48,58,48,38].map((h, i) => (
-                <div key={i} className="w-4 rounded-t-full" style={{ height: h, background: i === 2 ? '#1e3a2a' : '#2a4a3a', marginTop: -(h - 28) }}/>
-            ))}
-          </div>
-        </div>
 
-        {/* Vignette overlay */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(5,15,34,0.25) 0%, rgba(5,15,34,0.08) 50%, rgba(5,15,34,0.5) 100%)' }}/>
-
-        <ExploreBar active="Home"/>
-      </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 2 — INTRO + SUMMER CAMP PANEL
-───────────────────────────────────────────────────────────────── */
-function IntroSection() {
-  return (
-      <section className="grid" style={{ gridTemplateColumns: '1fr 340px' }}>
-        {/* Text */}
-        <div className="bg-white px-20 py-24">
-          <h2 className="font-serif text-[clamp(1.6rem,2.8vw,2.2rem)] font-bold text-[#0c2044] leading-tight mb-10 max-w-2xl">
-            One of the leading private boarding schools in Switzerland, Academia is home to a thriving international community of students aged 11 to 18.
-          </h2>
-          <div className="grid grid-cols-2 gap-10 mb-8 text-[0.9375rem] leading-relaxed text-slate-600">
-            <div className="space-y-5">
-              <p>Founded in 1910, Academia has long been regarded as one of Switzerland's finest private boarding schools. Our reputation is based not only on our holistic approach to education, but also our commitment to internationalism, warm boarding community, and strong values.</p>
-              <p>Uniquely located in a beautiful alpine village high in the Swiss Alps, Academia is a safe, inspiring, and exciting place to learn. Home to just 300 students — almost all full-time boarders — our school is like a family.</p>
-              <p>Our educational philosophy empowers our students to be the best they can be. Learning is personalised to individual strengths, passions, and ambitions.</p>
-            </div>
-            <div className="space-y-5">
-              <p>Life-changing opportunities — from whole-school challenges and global expeditions to our Winter Sports Programme — develop a breadth of skills, attributes, and experiences.</p>
-              <p>Inspired by passionate teachers and a caring community, our students gain outstanding academic results. This prepares them for the future of their choice — including courses at prestigious universities around the world.</p>
-            </div>
-          </div>
-          <button className="border-[1.5px] border-[#10295a] text-[#10295a] text-[0.7rem] font-bold tracking-widest uppercase px-6 py-3 rounded-full hover:bg-[#10295a] hover:text-white transition-all duration-200">
-            Find Out More
-          </button>
-        </div>
-
-        {/* Summer camp panel */}
-        <div className="flex flex-col items-center justify-between p-10 relative overflow-hidden" style={{ background: '#1690d8' }}>
-          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full" style={{ background: 'rgba(255,255,255,0.07)' }}/>
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}/>
-          <h3 className="font-serif text-2xl font-bold text-white text-center leading-snug relative z-10">
-            Summer Camps at Academia
-          </h3>
-          <button className="text-white text-[0.7rem] font-bold tracking-widest uppercase px-6 py-3 rounded-full relative z-10 hover:opacity-90 transition-opacity" style={{ background: '#c9700e' }}>
-            Discover
-          </button>
-          {/* Zipline figure */}
-          <div className="relative z-10 w-full flex-1 flex items-end justify-center min-h-[220px]">
-            <div className="absolute top-8 left-[15%] right-[10%] h-0.5 bg-white/40" style={{ transform: 'rotate(18deg)', transformOrigin: 'left center' }}/>
-            <div className="absolute top-10 left-[52%] -translate-x-1/2 flex flex-col items-center">
-              <div className="w-10 h-10 rounded-full mb-0.5" style={{ background: 'linear-gradient(135deg, #e8f4ff, #c0d8f0)', border: '3px solid rgba(255,255,255,0.4)' }}/>
-              <div className="w-9 h-14 rounded-lg relative" style={{ background: 'white' }}>
-                <div className="absolute top-2 left-0.5 right-0.5 h-0.5 rounded" style={{ background: '#e2b23e' }}/>
-                <div className="absolute top-5 left-0.5 right-0.5 h-0.5 rounded" style={{ background: '#e2b23e' }}/>
-              </div>
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0.5 h-8 bg-white/70"/>
-              <div className="flex gap-1 mt-0.5">
-                <div className="w-3 h-7 rounded" style={{ background: '#0e4a7a', transform: 'rotate(10deg)' }}/>
-                <div className="w-3 h-7 rounded" style={{ background: '#0e4a7a', transform: 'rotate(-5deg)' }}/>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 3 — ACADEMIC (full-height slide, sky blue)
-───────────────────────────────────────────────────────────────── */
-function AcademicSection() {
-  return (
-      <section className="relative h-screen min-h-[640px] overflow-hidden" style={{ background: '#1690d8' }}>
-        {/* Left visual panel */}
-        <div className="absolute left-0 top-0 bottom-0 w-[58%] overflow-hidden">
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #1a3a5c 0%, #2d6a9f 40%, #1a8fd1 70%, #3caee8 100%)' }}/>
-          {/* Large quote marks */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <span className="font-serif font-bold leading-none" style={{ fontSize: 'clamp(12rem,20vw,17rem)', letterSpacing: '-0.05em', color: 'rgba(56,169,235,0.65)' }}>
-            ""
-          </span>
-          </div>
-          {/* Grad cap crowd */}
-          <div className="absolute bottom-20 left-8 right-8 grid gap-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', transform: 'perspective(900px) rotateY(5deg)' }}>
-            {[56,72,62,80,58,74,66,84,70,60,76,64,82,68,72,88].map((h, i) => (
-                <div key={i} className="relative rounded-t-full flex-shrink-0" style={{ width: 44, height: h, background: i % 3 === 0 ? '#1a3a6c' : i % 3 === 1 ? '#2a5080' : '#3a6090' }}>
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-0 h-0" style={{ borderLeft: '16px solid transparent', borderRight: '16px solid transparent', borderBottom: '14px solid #e2b23e' }}/>
-                  <div className="absolute top-0 right-0.5 w-0.5 h-4 rounded" style={{ background: '#e2b23e' }}/>
+            {/* ── TOP CENTER: Logo + School Name ── */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div style={{ marginBottom: "6px" }}>
+                    <Image src={LOGO_SRC} alt="Beau Soleil logo" width={54} height={60} style={{ objectFit: "contain" }} />
                 </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right content */}
-        <div className="absolute right-0 top-0 bottom-[72px] w-[42%] flex items-center pl-8 pr-20 text-white text-right">
-          <div>
-            <span className="block text-[0.68rem] font-bold tracking-widest uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>Learning at Academia</span>
-            <h2 className="font-serif text-[clamp(2rem,3.5vw,2.75rem)] font-bold leading-tight mb-5">Unlocking passion and potential</h2>
-            <p className="text-[0.9375rem] leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              At Academia, every student's education is unique to them. Personalised to individual passions and ambitions, our globally respected academic programmes — which include the International Baccalaureate and Advanced Studies Diploma — engage, motivate, and inspire our learners to excel.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 hover:border-white transition-all">Uncover</button>
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 hover:border-white transition-all">Find Out More</button>
-            </div>
-          </div>
-        </div>
-
-        <SlideArrows/>
-        <ExploreBar active="Academic"/>
-      </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 4 — BOARDING (full-height slide, dark navy)
-───────────────────────────────────────────────────────────────── */
-function BoardingSection() {
-  return (
-      <section className="relative h-screen min-h-[640px] overflow-hidden" style={{ background: 'linear-gradient(160deg, #091a38 0%, #0e2550 60%, #153066 100%)' }}>
-        {/* Left visual */}
-        <div className="absolute left-0 top-0 bottom-0 w-[55%] overflow-hidden">
-          {/* Tree silhouette */}
-          <svg className="absolute left-[4%] top-0 h-full opacity-50" style={{ width: '42%' }} viewBox="0 0 200 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-            <path d="M100 10 Q130 80 170 100 Q210 120 185 150 Q220 185 195 215 Q225 255 185 285 Q215 325 175 360 Q205 405 165 440 L135 440 L135 380 L145 380 L145 355 L105 355 L105 440 L75 440 L75 380 L85 380 L85 355 L65 355 Q25 405 35 440 L25 440 Q-15 400 10 360 Q-20 320 20 290 Q-10 255 30 225 Q-5 190 35 165 Q10 130 55 110 Q30 75 80 50Z" fill="#163470" opacity="0.9"/>
-            <ellipse cx="100" cy="60" rx="38" ry="27" fill="#1a4070" opacity="0.7"/>
-            <ellipse cx="158" cy="128" rx="30" ry="22" fill="#163870" opacity="0.65"/>
-            <ellipse cx="48" cy="142" rx="34" ry="24" fill="#1a4070" opacity="0.65"/>
-            <ellipse cx="188" cy="200" rx="26" ry="18" fill="#163870" opacity="0.55"/>
-            <ellipse cx="30" cy="218" rx="30" ry="20" fill="#1a4070" opacity="0.6"/>
-          </svg>
-
-          {/* Slanted image strips */}
-          <div className="absolute flex flex-col gap-4 justify-center" style={{ right: '4%', top: '18%', bottom: '18%', width: '40%' }}>
-            {[
-              { bg: 'linear-gradient(135deg, #2d6a9f, #1a8fd1)', w: '92%', ml: '0%' },
-              { bg: 'linear-gradient(135deg, #e2b23e, #c9700e)', w: '85%', ml: '7%' },
-              { bg: 'linear-gradient(135deg, #9a3a7a, #6a1a5a)', w: '78%', ml: '12%' },
-            ].map((s, i) => (
-                <div key={i} className="h-[68px] rounded overflow-hidden" style={{ background: s.bg, transform: 'skewX(-3deg)', width: s.w, marginLeft: s.ml }}/>
-            ))}
-          </div>
-
-          {/* Walking students */}
-          <div className="absolute bottom-[16%] left-[8%] flex items-end gap-3">
-            {[{ body: '#6a3a8a', skin: '#9a7a5a' }, { body: '#6a3a8a', skin: '#c8a882' }, { body: '#cc2222', skin: '#d4927a' }].map((f, i) => (
-                <div key={i} className="flex flex-col items-center">
-                  <div className="w-6 h-6 rounded-full mb-0.5" style={{ background: f.skin }}/>
-                  <div className="w-5 h-12 rounded" style={{ background: f.body }}/>
-                  <div className="flex gap-0.5 mt-0.5">
-                    <div className="w-2 h-7 rounded" style={{ background: '#3a2870' }}/>
-                    <div className="w-2 h-7 rounded" style={{ background: '#3a2870' }}/>
-                  </div>
+                <div style={{ textAlign: "center", lineHeight: 1.3 }}>
+                    <p style={{ fontFamily: "Georgia,'Times New Roman',serif", color: "white", fontSize: "20px", letterSpacing: "0.18em", fontWeight: 400, margin: 0, textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>Beau Soleil</p>
+                    <p style={{ fontFamily: "Georgia,'Times New Roman',serif", color: "rgba(255,255,255,0.78)", fontSize: "9px", letterSpacing: "0.24em", textTransform: "uppercase", margin: "3px 0 0 0" }}>Collège Alpin International</p>
                 </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right content */}
-        <div className="absolute right-0 top-0 bottom-[72px] w-[45%] flex items-center pl-8 pr-20 text-white text-right">
-          <div>
-            <span className="block text-[0.68rem] font-bold tracking-widest uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>Boarding at Academia</span>
-            <h2 className="font-serif text-[clamp(2rem,3.5vw,2.75rem)] font-bold leading-tight mb-5">A home away from home</h2>
-            <p className="text-[0.9375rem] leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              Community is at the heart of the Academia boarding experience. Each of our six houses is a warm and welcoming home away from home, where students from around the world forge friendships that last a lifetime.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 transition-all">Uncover</button>
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 transition-all">Find Out More</button>
             </div>
-          </div>
-        </div>
 
-        <SlideArrows/>
-        <ExploreBar active="Boarding"/>
-      </section>
-  );
-}
+            {/* ── TOP RIGHT: Enquire Now + Search + Hamburger ── */}
+            <div className="absolute top-5 right-7 z-20" style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                <button
+                    style={{ padding: "11px 30px", border: "1.5px solid rgba(255,255,255,0.85)", borderRadius: "999px", background: "transparent", color: "white", fontSize: "10px", fontWeight: 700, letterSpacing: "0.2em", cursor: "pointer", transition: "all 0.3s ease", whiteSpace: "nowrap" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "white"; e.currentTarget.style.color = "#111"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "white"; }}
+                >
+                    ENQUIRE NOW
+                </button>
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 5 — CO-CURRICULAR (full-height, adventure/mountain)
-───────────────────────────────────────────────────────────────── */
-function CoCurricularSection() {
-  return (
-      <section className="relative h-screen min-h-[640px] overflow-hidden" style={{ background: '#091a38' }}>
-        {/* Sky */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #87a5bb 0%, #6a8fa8 25%, #4a7090 50%, #2a5070 75%, #0a2040 100%)' }}/>
-        {/* Far mountain peaks */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #3a5a6a 0%, #1e3540 100%)', clipPath: 'polygon(0% 100%, 8% 50%, 18% 70%, 28% 25%, 38% 55%, 48% 10%, 58% 45%, 68% 30%, 78% 60%, 88% 35%, 100% 55%, 100% 100%)' }}/>
-        {/* Close rocky foreground */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 0%, #0a2030 100%)', clipPath: 'polygon(0% 100%, 5% 68%, 14% 78%, 22% 52%, 30% 72%, 40% 44%, 50% 68%, 60% 50%, 70% 72%, 80% 52%, 90% 70%, 100% 58%, 100% 100%)' }}/>
+                {/* Search icon — opens search overlay */}
+                <button
+                    onClick={() => setSearchOpen(true)}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", color: "rgba(255,255,255,0.8)", transition: "color 0.2s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "white")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="7.5" /><line x1="17" y1="17" x2="22" y2="22" />
+                    </svg>
+                </button>
 
-        {/* Summit cross */}
-        <div className="absolute" style={{ bottom: '51%', left: '33%' }}>
-          <div className="w-[3px] h-10 mx-auto" style={{ background: 'rgba(240,220,160,0.85)' }}/>
-          <div className="h-[3px] w-6 -mt-7 -ml-[10px]" style={{ background: 'rgba(240,220,160,0.85)' }}/>
-        </div>
-
-        {/* Hiker group */}
-        <div className="absolute flex items-end gap-3" style={{ bottom: '42%', left: '18%' }}>
-          {[
-            { body: '#1a3a6c', skin: '#8a7060', h: 36 },
-            { body: '#3a5a8a', skin: '#7a6050', h: 30 },
-            { body: '#4a7a9a', skin: '#9a8070', h: 40 },
-            { body: '#3a6090', skin: '#6a5040', h: 28 },
-            { body: '#2a5888', skin: '#8a7060', h: 38 },
-          ].map((f, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full mb-0.5" style={{ background: f.skin }}/>
-                <div className="w-3.5 rounded" style={{ height: f.h, background: f.body }}/>
-                <div className="flex gap-0.5 mt-0.5">
-                  <div className="w-1.5 h-4 rounded" style={{ background: '#1e1e50' }}/>
-                  <div className="w-1.5 h-4 rounded" style={{ background: '#1e1e50' }}/>
-                </div>
-              </div>
-          ))}
-        </div>
-
-        {/* Globe motif top-right */}
-        <div className="absolute -top-[8%] -right-[8%] w-80 h-80 rounded-full opacity-60" style={{ background: 'linear-gradient(135deg, rgba(30,80,140,0.6), rgba(20,50,100,0.4))', border: '2px solid rgba(100,160,210,0.2)' }}/>
-
-        {/* Right content */}
-        <div className="absolute right-0 top-0 bottom-[72px] w-[44%] flex items-center pl-8 pr-20 text-white text-right">
-          <div>
-            <span className="block text-[0.68rem] font-bold tracking-widest uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>The Academia Experience</span>
-            <h2 className="font-serif text-[clamp(2rem,3.5vw,2.75rem)] font-bold leading-tight mb-5">Endless opportunities for adventure</h2>
-            <p className="text-[0.9375rem] leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.8)' }}>
-              At Academia, we believe it's what you do that counts. From character-building challenges and community service projects to alpine adventures and global expeditions, we offer an unparalleled range of experiences that shape our students' futures.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 transition-all">Uncover</button>
-              <button className="border border-white/50 text-white text-[0.7rem] font-bold tracking-widest uppercase px-5 py-2.5 rounded-full hover:bg-white/15 transition-all">Find Out More</button>
+                {/* Hamburger */}
+                <button
+                    onClick={() => setMenuOpen(true)}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", flexDirection: "column", gap: "5px", alignItems: "flex-end", color: "rgba(255,255,255,0.8)", transition: "color 0.2s" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "white")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+                >
+                    <span style={{ display: "block", width: "22px", height: "1.5px", background: "currentColor" }} />
+                    <span style={{ display: "block", width: "22px", height: "1.5px", background: "currentColor" }} />
+                    <span style={{ display: "block", width: "22px", height: "1.5px", background: "currentColor" }} />
+                </button>
             </div>
-          </div>
-        </div>
 
-        <SlideArrows/>
-        <ExploreBar active="Co-Curricular"/>
-      </section>
-  );
-}
+            {/* ── RIGHT SIDE: Scroll arrows ── */}
+            <div className="absolute right-6 top-1/2 -translate-y-1/2 z-20" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+                <button style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.75)", padding: "4px" }}>
+                    <svg width="16" height="22" viewBox="0 0 16 22" fill="none"><path d="M8 20 L8 2 M2 8 L8 2 L14 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+                <button style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.75)", padding: "4px" }}>
+                    <svg width="16" height="22" viewBox="0 0 16 22" fill="none"><path d="M8 2 L8 20 M2 14 L8 20 L14 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
+            </div>
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 6 — LOCATION / OUTDOOR ADVENTURES
-───────────────────────────────────────────────────────────────── */
-function LocationSection() {
-  return (
-      <section style={{ background: '#0c2044' }} className="overflow-hidden">
-        {/* Banner */}
-        <div className="relative px-20 pt-16 pb-10 overflow-hidden">
-          <div className="absolute -top-20 -right-16 w-96 h-96 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #1a8fd1, transparent)' }}/>
-          <h2 className="font-serif text-white text-[clamp(1.75rem,3vw,2.5rem)] font-bold max-w-xl leading-tight relative z-10">
-            Our location in the Swiss Alps allows unmatched opportunities
-          </h2>
-        </div>
+            {/* ── BOTTOM LEFT: Virtual tour button ── */}
+            <div className="absolute z-20" style={{ bottom: "88px", left: "20px" }}>
+                <button style={{ width: "44px", height: "44px", borderRadius: "50%", background: "rgba(255,255,255,0.18)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.4)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
+                </button>
+            </div>
 
-        <div className="grid grid-cols-2">
-          {/* Mountain landscape */}
-          <div className="relative min-h-[420px] overflow-hidden">
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #7aa5c0 0%, #4a7898 25%, #2a5878 50%, #0e2d50 100%)' }}/>
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #2a5060 0%, #0e2030 100%)', clipPath: 'polygon(0% 100%, 10% 45%, 22% 65%, 33% 20%, 46% 55%, 58% 15%, 68% 48%, 80% 28%, 90% 58%, 100% 35%, 100% 100%)' }}/>
-            {/* Hikers */}
-            <div className="absolute flex items-end gap-3" style={{ bottom: '24%', left: '10%' }}>
-              {[{ body: '#1a5a8a', skin: '#8a7060' }, { body: '#e26020', skin: '#7a6050' }, { body: '#4a7aaa', skin: '#9a8070' }].map((f, i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <div className="w-5 h-5 rounded-full mb-0.5" style={{ background: f.skin }}/>
-                    <div className="w-4 h-10 rounded" style={{ background: f.body }}/>
-                    <div className="flex gap-0.5 mt-0.5">
-                      <div className="w-1.5 h-5 rounded" style={{ background: '#103070' }}/>
-                      <div className="w-1.5 h-5 rounded" style={{ background: '#103070' }}/>
+            {/* ── BOTTOM NAV BAR ── */}
+            <div className="absolute bottom-0 left-0 right-0 z-20" style={{ background: "linear-gradient(to right, rgba(12,18,28,0.94), rgba(18,26,40,0.97), rgba(12,18,28,0.94))", backdropFilter: "blur(10px)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 32px" }}>
+                    <span style={{ color: "rgba(255,255,255,0.48)", fontSize: "10px", letterSpacing: "0.32em", textTransform: "uppercase", marginRight: "40px", fontWeight: 500 }}>EXPLORE</span>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                        {navItems.map((item, index) => (
+                            <div key={item} style={{ display: "flex", alignItems: "center" }}>
+                                {index > 0 && <div style={{ height: "1px", width: "50px", margin: "0 8px", background: "linear-gradient(to right, rgba(200,168,75,0.25), rgba(200,168,75,0.65), rgba(200,168,75,0.25))" }} />}
+                                <button
+                                    onClick={() => setActiveNav(item)}
+                                    style={{ padding: "10px 26px", borderRadius: "999px", border: activeNav === item ? "1.5px solid white" : "1.5px solid rgba(255,255,255,0.35)", background: activeNav === item ? "white" : "transparent", color: activeNav === item ? "#111827" : "rgba(255,255,255,0.78)", fontSize: "11px", fontWeight: 600, letterSpacing: "0.18em", textTransform: "uppercase", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.25s ease" }}
+                                    onMouseEnter={(e) => { if (activeNav !== item) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.7)"; e.currentTarget.style.color = "white"; } }}
+                                    onMouseLeave={(e) => { if (activeNav !== item) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"; e.currentTarget.style.color = "rgba(255,255,255,0.78)"; } }}
+                                >
+                                    {item}
+                                </button>
+                            </div>
+                        ))}
                     </div>
-                  </div>
-              ))}
+                </div>
             </div>
-          </div>
 
-          {/* Info panel */}
-          <div className="bg-white px-16 py-14">
-            <div className="w-10 h-[3px] rounded-full mb-4" style={{ background: 'linear-gradient(90deg, #e8b84b, #38a9eb)' }}/>
-            <h3 className="font-serif text-2xl font-bold text-[#0c2044] leading-snug mb-5">Awe-inspiring outdoor adventures</h3>
-            <p className="text-[0.9375rem] leading-relaxed text-slate-600 mb-6">
-              Our outdoor education programme is packed with exhilarating adventures. From mountain climbing to canyoning, cross-country skiing to canoeing, our students push themselves beyond their comfort zone, overcome challenges, and work as a team. This builds confidence and resilience, and develops vital future-ready skills, such as leadership and communication.
-            </p>
-            {/* Thumbnail strip */}
-            <div className="grid grid-cols-4 gap-2 mt-6">
-              {[
-                'linear-gradient(135deg, #2d7a4f, #1a5a38)',
-                'linear-gradient(135deg, #2d6a9f, #1a4a7a)',
-                'linear-gradient(135deg, #c9700e, #8a4a0a)',
-                'linear-gradient(135deg, #153066, #091a38)',
-              ].map((bg, i) => (
-                  <div key={i} className="relative rounded overflow-hidden cursor-pointer" style={{ aspectRatio: '3/4', background: bg }}>
-                    <div className="absolute bottom-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: '#c9700e' }}>+</div>
-                  </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-  );
-}
+            {/* ══════════════════════════════════════════
+          SEARCH OVERLAY
+      ══════════════════════════════════════════ */}
+            {searchOpen && (
+                <div
+                    style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(8,16,32,0.92)", backdropFilter: "blur(16px)", display: "flex", flexDirection: "column", alignItems: "center" }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
+                >
+                    {/* Close */}
+                    <button
+                        onClick={() => setSearchOpen(false)}
+                        style={{ position: "absolute", top: "24px", right: "32px", background: "none", border: "none", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: "28px", lineHeight: 1, padding: "4px 8px", transition: "color 0.2s" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "white")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+                    >
+                        ✕
+                    </button>
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 7 — PRINCIPAL QUOTE + PHOTO MOSAIC
-───────────────────────────────────────────────────────────────── */
-function QuoteSection() {
-  return (
-      <section className="bg-[#f5f6fa] py-24 px-20 text-center">
-        <Crest/>
-        <blockquote className="font-serif italic text-[#0c2044] leading-relaxed max-w-4xl mx-auto mt-8 mb-5" style={{ fontSize: 'clamp(1.1rem, 2vw, 1.45rem)' }}>
-          "School is a place to be curious, to take initiative, and to discover new experiences in a community built on trust, respect, and kindness. I invite all of our students to grasp the wonderful opportunities offered by Academia with enthusiasm and an open mind."
-        </blockquote>
-        <p className="text-[0.72rem] font-bold tracking-widest uppercase text-slate-400">— Benjamin Turner, Principal</p>
+                    {/* Logo + title */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "60px", marginBottom: "40px" }}>
+                        <Image src={LOGO_SRC} alt="Beau Soleil logo" width={46} height={52} style={{ objectFit: "contain" }} />
+                        <p style={{ fontFamily: "Georgia,'Times New Roman',serif", color: "white", fontSize: "16px", letterSpacing: "0.16em", margin: "8px 0 2px 0" }}>Beau Soleil</p>
+                        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "11px", letterSpacing: "0.18em", margin: 0 }}>Search</p>
+                    </div>
 
-        {/* Photo mosaic */}
-        <div className="relative mt-16 mx-auto max-w-5xl" style={{ display: 'grid', gridTemplateColumns: '200px 380px 200px 280px', gridTemplateRows: '200px 180px', gap: '0.75rem' }}>
-          {[
-            { bg: 'linear-gradient(135deg,#1a3a6c,#2d5a9f)', col: '1', row: '1/3' },
-            { bg: 'linear-gradient(135deg,#2d6a9f,#1a8fd1)', col: '2', row: '1' },
-            { bg: 'linear-gradient(135deg,#153066,#0e2550)', col: '3', row: '1' },
-            { bg: 'linear-gradient(135deg,#c9970f,#e2b23e)', col: '4', row: '1/3' },
-            { bg: 'linear-gradient(135deg,#0d75bd,#3caee8)', col: '2', row: '2' },
-            { bg: 'linear-gradient(135deg,#0e2550,#153066)', col: '3', row: '2' },
-          ].map((p, i) => (
-              <div key={i} className="rounded-lg" style={{ background: p.bg, gridColumn: p.col, gridRow: p.row }}/>
-          ))}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white text-[0.72rem] font-semibold px-4 py-1.5 rounded-full whitespace-nowrap pointer-events-none" style={{ background: 'rgba(9,26,56,0.75)', backdropFilter: 'blur(4px)' }}>
-            Drag cursor to move
-          </div>
-        </div>
-      </section>
-  );
-}
+                    {/* Search input bar */}
+                    <div style={{ width: "100%", maxWidth: "640px", padding: "0 24px", position: "relative" }}>
+                        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                            {/* Search icon inside input */}
+                            <svg
+                                width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                                style={{ position: "absolute", left: "18px", pointerEvents: "none", zIndex: 1 }}
+                            >
+                                <circle cx="11" cy="11" r="7.5" /><line x1="17" y1="17" x2="22" y2="22" />
+                            </svg>
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 8 — CAMPUS DESCRIPTION + PANORAMA
-───────────────────────────────────────────────────────────────── */
-function CampusSection() {
-  return (
-      <section className="bg-white py-24 px-20 text-center">
-        <Crest/>
-        <p className="font-serif text-[#0c2044] leading-relaxed max-w-3xl mx-auto mt-8 mb-16" style={{ fontSize: 'clamp(1.05rem, 1.7vw, 1.3rem)' }}>
-          Tucked away in an idyllic alpine village — and surrounded by magnificent mountain peaks, verdant pine forests, and big skies — our campus is an inspiring Swiss boarding school to live and learn. Specialist art, design, and music spaces, outstanding sports facilities, and cutting-edge interactive technology bring learning to life. Our close-knit international community, meanwhile, is truly unique, providing a supportive and inspirational setting in which to live and learn.
-        </p>
+                            <input
+                                ref={searchInputRef}
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search pages, programmes, news…"
+                                style={{
+                                    width: "100%",
+                                    padding: "18px 48px 18px 52px",
+                                    borderRadius: "999px",
+                                    border: "1.5px solid rgba(255,255,255,0.2)",
+                                    background: "rgba(255,255,255,0.07)",
+                                    color: "white",
+                                    fontSize: "16px",
+                                    letterSpacing: "0.02em",
+                                    outline: "none",
+                                    transition: "border-color 0.2s, background 0.2s",
+                                    boxSizing: "border-box",
+                                }}
+                                onFocus={(e) => { e.currentTarget.style.borderColor = "#d4a820"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+                                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                            />
 
-        {/* Alpine panorama illustration */}
-        <div className="w-full max-w-5xl mx-auto h-96 rounded-2xl overflow-hidden relative">
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, #c8dce8 0%, #9ab8cc 20%, #6a94b0 40%, #3a6a88 60%, #1a4060 80%, #0a2030 100%)' }}/>
-          {/* Mountain silhouettes */}
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(40,80,100,0) 0%, rgba(10,30,50,0.9) 100%)', clipPath: 'polygon(0% 100%, 5% 60%, 15% 75%, 25% 40%, 35% 65%, 50% 25%, 65% 60%, 75% 40%, 85% 70%, 95% 50%, 100% 65%, 100% 100%)' }}/>
-          {/* Village buildings */}
-          <div className="absolute bottom-[28%] left-[14%] w-20 h-24 rounded-t" style={{ background: 'linear-gradient(180deg, #c8d8e0, #a8b8c8)' }}/>
-          <div className="absolute bottom-[28%] left-[22%] w-14 h-20 rounded-t" style={{ background: 'linear-gradient(180deg, #d0dce4, #b0c0cc)' }}/>
-          <div className="absolute bottom-[28%] left-[30%] w-24 h-28 rounded-t" style={{ background: 'linear-gradient(180deg, #b8ccd8, #98aab8)' }}/>
-          {/* Main school */}
-          <div className="absolute bottom-[28%] right-[16%] w-44 h-36 rounded-t shadow-xl" style={{ background: 'linear-gradient(180deg, #d8e8f0, #c0d0dc)' }}/>
-          {/* Ground */}
-          <div className="absolute bottom-0 left-0 right-0 h-[28%]" style={{ background: 'linear-gradient(180deg, #1e3a4a, #0a1e2a)' }}/>
-        </div>
-      </section>
-  );
-}
+                            {/* Clear button */}
+                            {query && (
+                                <button
+                                    onClick={() => { setQuery(""); searchInputRef.current?.focus(); }}
+                                    style={{ position: "absolute", right: "18px", background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "4px" }}
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
-/* ─────────────────────────────────────────────────────────────────
-   SECTION 9 — ADMISSIONS
-───────────────────────────────────────────────────────────────── */
-function AdmissionsSection() {
-  return (
-      <section className="overflow-hidden">
-        <div className="grid" style={{ gridTemplateColumns: '1fr 380px 1fr' }}>
-          {/* Left: assembly */}
-          <div className="relative min-h-[520px] overflow-hidden" style={{ background: 'linear-gradient(160deg, #1a3060, #0e2040)' }}>
-            {/* Play button */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-all" style={{ border: '2px dashed rgba(255,255,255,0.4)', background: 'rgba(9,26,56,0.7)' }}>
-              <div className="w-0 h-0 ml-1" style={{ borderLeft: '14px solid #c9700e', borderTop: '9px solid transparent', borderBottom: '9px solid transparent' }}/>
-            </div>
-            {/* Value tags */}
-            <div className="absolute top-24 left-4 right-4 flex flex-wrap gap-2">
-              {[{ l: '#Respect', bg: '#10295a' }, { l: '#Responsibility', bg: '#c9970f' }, { l: '#Ambition', bg: '#1a8fd1' }, { l: '#Determination', bg: '#c9700e' }].map((t, i) => (
-                  <span key={i} className="text-white text-[0.62rem] font-bold tracking-wide px-3 py-1 rounded" style={{ background: t.bg }}>{t.l}</span>
-              ))}
-            </div>
-            {/* Audience silhouettes */}
-            <div className="absolute bottom-[12%] left-[8%] right-[8%]">
-              <div className="flex gap-1.5 justify-center mb-1.5">
-                {['#8a7060','#6a5040','#9a8070','#c8a882','#8a7060','#7a6050','#d4a882','#8a6848','#c8a882'].map((c, i) => (
-                    <div key={i} className="rounded-t-full" style={{ width: i === 8 ? 28 : 20, height: i === 8 ? 34 : 24, background: c }}/>
-                ))}
-              </div>
-              <div className="flex gap-1.5 justify-center">
-                {['#c8a882','#9a7858','#7a6050','#e8c090','#8a6848','#c8a882'].map((c, i) => (
-                    <div key={i} className="rounded-t-full" style={{ width: 26, height: 32, background: c }}/>
-                ))}
-              </div>
-            </div>
-          </div>
+                    {/* Results / suggestions */}
+                    <div style={{ width: "100%", maxWidth: "640px", padding: "0 24px", marginTop: "20px", flex: 1, overflowY: "auto" }}>
 
-          {/* Center: card */}
-          <div className="flex flex-col items-center text-center gap-5 px-10 py-14 text-white" style={{ background: '#10295a' }}>
-            <Crest/>
-            <h2 className="font-serif text-3xl font-bold">Admissions</h2>
-            <p className="text-[0.9rem] leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
-              We're delighted that you're interested in joining the Academia family. Your journey starts with our expert Admissions Team, who will guide you through the process — from helping you submit your application form to arranging a guided tour.
-            </p>
-            <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Our school — which is home to around 300 students — is small but diverse. This means places are limited, and we'd encourage you to apply as soon as possible to avoid disappointment.
-            </p>
-            <div className="flex flex-col gap-3 w-full mt-2">
-              <button className="w-full border text-white text-[0.7rem] font-bold tracking-widest uppercase py-3 rounded-full hover:bg-white/10 transition-all" style={{ borderColor: 'rgba(255,255,255,0.5)' }}>Arrange a Visit</button>
-              <button className="w-full border text-white text-[0.7rem] font-bold tracking-widest uppercase py-3 rounded-full hover:bg-white/10 transition-all" style={{ borderColor: 'rgba(255,255,255,0.5)' }}>Applications</button>
-            </div>
-          </div>
+                        {/* No query — show popular */}
+                        {!query.trim() && (
+                            <div>
+                                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: "14px", fontWeight: 600 }}>
+                                    Popular Pages
+                                </p>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                                    {popular.map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setQuery(p)}
+                                            style={{ padding: "8px 18px", borderRadius: "999px", border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)", fontSize: "13px", cursor: "pointer", transition: "all 0.2s" }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#d4a820"; e.currentTarget.style.color = "#d4a820"; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-          {/* Right: modern interior */}
-          <div className="relative min-h-[520px] overflow-hidden" style={{ background: 'linear-gradient(160deg, #0e2040, #060f20)' }}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              {[{ w: 200, h: 300, a: 0.28 }, { w: 150, h: 220, a: 0.22 }, { w: 100, h: 150, a: 0.18 }, { w: 50, h: 72, a: 0.14 }].map((r, i) => (
-                  <div key={i} className="absolute rounded-full" style={{ width: r.w, height: r.h, border: `${3 - i * 0.5}px solid rgba(100,160,210,${r.a})` }}/>
-              ))}
-            </div>
-            {/* Interior figures */}
-            <div className="absolute flex items-end gap-2 opacity-70" style={{ bottom: '14%', right: '10%' }}>
-              {[{ body: '#1a2a50', skin: '#c8a882' }, { body: '#c9970f', skin: '#8a7060' }, { body: '#1a3a6c', skin: '#e8c090' }].map((f, i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <div className="w-4 h-4 rounded-full mb-0.5" style={{ background: f.skin }}/>
-                    <div className="w-3 h-8 rounded" style={{ background: f.body }}/>
-                  </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-  );
-}
+                        {/* Has query — show results */}
+                        {query.trim().length > 1 && (
+                            <div>
+                                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: "10px", letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: "14px", fontWeight: 600 }}>
+                                    {results.length > 0 ? `${results.length} Result${results.length !== 1 ? "s" : ""}` : "No results found"}
+                                </p>
 
-/* ─────────────────────────────────────────────────────────────────
-   FOOTER
-───────────────────────────────────────────────────────────────── */
-function Footer() {
-  return (
-      <footer className="text-white px-20 pt-20 pb-8" style={{ background: '#0c2044' }}>
-        <div className="text-center mb-14">
-          <Crest size="lg"/>
-          <div className="font-serif text-2xl font-bold text-white mt-3">Academia</div>
-          <div className="text-[0.65rem] tracking-widest text-white/40 mt-0.5">Collège Alpin International</div>
-        </div>
+                                {results.length === 0 && (
+                                    <div style={{ textAlign: "center", paddingTop: "40px" }}>
+                                        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "15px" }}>
+                                            No pages match <span style={{ color: "white" }}>"{query}"</span>
+                                        </p>
+                                        <p style={{ color: "rgba(255,255,255,0.25)", fontSize: "13px", marginTop: "8px" }}>
+                                            Try searching for Academic, Boarding, Sports, Admissions…
+                                        </p>
+                                    </div>
+                                )}
 
-        <div className="grid grid-cols-5 gap-8 pb-12 mb-8 border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-          {/* Contact */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4">Contact us</h4>
-            <div className="text-sm leading-8" style={{ color: 'rgba(255,255,255,0.55)' }}>
-              <p>Collège Alpin Academia</p>
-              <p>Route du Village 1</p>
-              <p>1884 Villars-sur-Ollon</p>
-              <p>Switzerland</p>
-              <div className="mt-2">
-                <a href="#" className="block no-underline hover:text-white transition-colors" style={{ color: 'rgba(255,255,255,0.75)' }}>info@academia.ch</a>
-                <a href="#" className="block no-underline hover:text-white transition-colors" style={{ color: 'rgba(255,255,255,0.55)' }}>+41 24 496 26 26</a>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
-              {['f','in','li','x','▶'].map((ic, i) => (
-                  <button key={i} className="w-9 h-9 rounded-full text-[#06152e] text-xs font-bold flex items-center justify-center hover:-translate-y-0.5 transition-all" style={{ background: '#e2b23e' }}>
-                    {ic}
-                  </button>
-              ))}
-            </div>
-          </div>
+                                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+                                    {results.map((r, i) => (
+                                        <li key={i}>
+                                            <a
+                                                href="#"
+                                                onClick={() => setSearchOpen(false)}
+                                                style={{ display: "flex", alignItems: "center", gap: "16px", padding: "14px 16px", borderRadius: "10px", textDecoration: "none", background: "rgba(255,255,255,0.03)", transition: "background 0.18s", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                                                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(212,168,32,0.1)")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.03)")}
+                                            >
+                                                {/* Page icon */}
+                                                <div style={{ width: "34px", height: "34px", borderRadius: "8px", background: "rgba(212,168,32,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a820" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                                                    </svg>
+                                                </div>
+                                                {/* Text */}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <p style={{ color: "white", fontSize: "14px", fontWeight: 500, margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                        <Highlight text={r.title} query={query} />
+                                                    </p>
+                                                    <p style={{ color: "rgba(255,255,255,0.38)", fontSize: "11px", margin: "2px 0 0 0" }}>
+                                                        <Highlight text={r.section} query={query} />
+                                                    </p>
+                                                </div>
+                                                {/* Arrow */}
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="9 18 15 12 9 6" />
+                                                </svg>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
 
-          {/* Information */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4">Information</h4>
-            {['News and events','Summer camp','Careers at Academia'].map(l => (
-                <a key={l} href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>{l}</a>
-            ))}
-            <div className="mt-4">
-              <div className="text-sm font-bold mb-1" style={{ color: 'rgba(255,255,255,0.75)' }}>Summer Camp</div>
-              <a href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>summercamp@academia.ch</a>
-              <a href="#" className="block text-sm no-underline hover:text-white transition-colors" style={{ color: 'rgba(255,255,255,0.55)' }}>+41 24 496 26 46</a>
-            </div>
-          </div>
+                    {/* Bottom hint */}
+                    <div style={{ padding: "16px", display: "flex", gap: "20px", alignItems: "center" }}>
+            <span style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <kbd style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", fontFamily: "monospace" }}>↵</kbd>
+              to select
+            </span>
+                        <span style={{ color: "rgba(255,255,255,0.25)", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <kbd style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", fontFamily: "monospace" }}>Esc</kbd>
+              to close
+            </span>
+                    </div>
+                </div>
+            )}
 
-          {/* Quick Access */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4">Quick Access</h4>
-            {['Online payments','Term dates'].map(l => (
-                <a key={l} href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>{l}</a>
-            ))}
-          </div>
+            {/* ══════════════════════════════════════════
+          HAMBURGER MENU OVERLAY
+      ══════════════════════════════════════════ */}
+            {menuOpen && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "stretch" }}>
+                    {/* Left bleed */}
+                    <div style={{ flex: "0 0 19%", position: "relative", overflow: "hidden" }}>
+                        <Image src="school_bg.jpg" alt="" fill unoptimized style={{ objectFit: "cover", objectPosition: "left center", filter: "brightness(0.55)" }} />
+                    </div>
 
-          {/* Admissions */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4">Admissions</h4>
-            {['Application process','Application form','Admission team','Terms and conditions'].map(l => (
-                <a key={l} href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>{l}</a>
-            ))}
-            <div className="mt-4">
-              <div className="text-sm font-bold mb-1" style={{ color: 'rgba(255,255,255,0.75)' }}>Admissions</div>
-              <a href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>admissions@academia.ch</a>
-              <a href="#" className="block text-sm no-underline hover:text-white transition-colors" style={{ color: 'rgba(255,255,255,0.55)' }}>+41 24 496 26 10</a>
-            </div>
-          </div>
+                    {/* Main navy panel */}
+                    <div style={{ flex: 1, background: "#0d2245", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+                        <button
+                            onClick={() => setMenuOpen(false)}
+                            style={{ position: "absolute", top: "22px", right: "28px", background: "none", border: "none", color: "white", cursor: "pointer", fontSize: "26px", lineHeight: 1, padding: "4px 8px", opacity: 0.85, transition: "opacity 0.2s" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.85")}
+                        >
+                            ✕
+                        </button>
 
-          {/* Policies */}
-          <div>
-            <h4 className="font-serif text-lg font-semibold mb-4">Policies</h4>
-            {['Legal notice','Website privacy and cookie policy','Accessibility statement'].map(l => (
-                <a key={l} href="#" className="block text-sm no-underline hover:text-white transition-colors mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>{l}</a>
-            ))}
-          </div>
-        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "24px", paddingBottom: "20px" }}>
+                            <Image src={LOGO_SRC} alt="Beau Soleil logo" width={46} height={52} style={{ objectFit: "contain" }} />
+                            <p style={{ fontFamily: "Georgia,'Times New Roman',serif", color: "white", fontSize: "17px", letterSpacing: "0.16em", margin: "6px 0 0 0" }}>Beau Soleil</p>
+                            <p style={{ fontFamily: "Georgia,'Times New Roman',serif", color: "rgba(255,255,255,0.6)", fontSize: "8px", letterSpacing: "0.22em", textTransform: "uppercase", margin: "3px 0 0 0" }}>Collège Alpin International</p>
+                        </div>
 
-        <div className="flex justify-between items-center text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-          <span>Design by <span className="font-bold" style={{ color: 'rgba(255,255,255,0.55)' }}>STUDIO</span>, powered by <span className="font-bold" style={{ color: 'rgba(255,255,255,0.55)' }}>AMAIS</span></span>
-          <span>© 2025 Academia · All rights reserved</span>
-        </div>
-      </footer>
-  );
-}
+                        <div style={{ height: "1px", background: "rgba(255,255,255,0.1)", margin: "0 40px" }} />
 
-/* ─────────────────────────────────────────────────────────────────
-   ROOT PAGE — all sections composed in order
-───────────────────────────────────────────────────────────────── */
-export default function HomePage() {
-  return (
-      <>
-        <Navbar />
-        <HeroSection />
-        <IntroSection />
-        <AcademicSection />
-        <BoardingSection />
-        <CoCurricularSection />
-        <AboutTextSection />
-        <LocationSection />
-        <QuoteSection />
-        <CampusSection />
-        <AdmissionsSection />
-        <Footer />
-      </>
-  );
-}
+                        <div style={{ flex: 1, overflowY: "auto", padding: "28px 40px 20px 40px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 24px", marginBottom: "32px" }}>
+                                {(["Academic", "Boarding", "Co-curricular"] as const).map((section) => (
+                                    <div key={section}>
+                                        <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+                                            <div style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", color: "#d4a820", fontSize: "15px", fontWeight: 600, letterSpacing: "0.08em", lineHeight: 1, minHeight: "100px", fontFamily: "Georgia,'Times New Roman',serif" }}>{section}</div>
+                                            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px", paddingTop: "4px" }}>
+                                                {menuData[section].map((item, i) => {
+                                                    const isObj = typeof item === "object";
+                                                    const label = isObj ? item.label : item;
+                                                    const hasArrow = isObj && item.hasArrow;
+                                                    return (
+                                                        <li key={i}>
+                                                            <a href="#" style={{ color: "white", textDecoration: "none", fontSize: "13.5px", fontWeight: 400, display: "flex", alignItems: "center", gap: "6px", opacity: 0.9, transition: "opacity 0.2s" }}
+                                                               onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                                                               onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.9")}
+                                                            >
+                                                                {label}
+                                                                {hasArrow && (
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }}>
+                                                                        <polyline points="9 18 15 12 9 6" />
+                                                                    </svg>
+                                                                )}
+                                                            </a>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
 
-/* AboutTextSection is defined between CoCurricularSection and LocationSection */
-function AboutTextSection() {
-  return (
-      <section className="bg-white py-24 px-20">
-        <div className="flex justify-center mb-10">
-          <Crest/>
-        </div>
-        <h2 className="font-serif text-[clamp(1.35rem,2.5vw,1.875rem)] font-bold text-[#0c2044] text-center leading-tight max-w-3xl mx-auto mb-16">
-          One of the leading private boarding schools in Switzerland, Academia is home to a thriving international community of students aged 11 to 18.
-        </h2>
-        <div className="grid grid-cols-2 gap-16 max-w-5xl mx-auto text-[0.9375rem] leading-relaxed text-slate-600">
-          <div className="space-y-5">
-            <p>Founded in 1910, Academia has long been regarded as one of Switzerland's finest private boarding schools. Our reputation is based not only on our holistic approach to education, but also our commitment to internationalism, warm boarding community, and strong values.</p>
-            <p>Uniquely located in a beautiful alpine village high in the Swiss Alps, Academia is a safe, inspiring, and exciting place to learn. Home to just 300 students — almost all full-time boarders — our school is like a family, where everyone receives the attention and guidance they need.</p>
-            <p>Our educational philosophy empowers our students to be the best they can be. Learning is personalised to individual strengths, passions, and ambitions, and stretches way beyond the classroom and campus.</p>
-          </div>
-          <div className="space-y-5">
-            <p>Life-changing opportunities — from whole-school challenges and global expeditions to our Winter Sports Programme — develop a breadth of skills, attributes, and experiences. They also nurture our students' understanding and appreciation of the world around them.</p>
-            <p>Inspired by passionate teachers and a caring community, our students gain outstanding academic results. This prepares them for the future of their choice — including courses at prestigious universities around the world.</p>
-            <button className="mt-2 border-[1.5px] border-[#10295a] text-[#10295a] text-[0.7rem] font-bold tracking-widest uppercase px-6 py-3 rounded-full hover:bg-[#10295a] hover:text-white transition-all duration-200">
-              Find Out More
-            </button>
-          </div>
-        </div>
-      </section>
-  );
+                            <div style={{ height: "1px", background: "rgba(255,255,255,0.08)", marginBottom: "28px" }} />
+
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0 24px" }}>
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+                                        <div style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", color: "#d4a820", fontSize: "15px", fontWeight: 600, letterSpacing: "0.08em", lineHeight: 1, minHeight: "80px", fontFamily: "Georgia,'Times New Roman',serif" }}>About Us</div>
+                                        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px", paddingTop: "4px" }}>
+                                            {menuData["About Us"].map((item, i) => (
+                                                <li key={i}>
+                                                    <a href="#" style={{ color: "white", textDecoration: "none", fontSize: "13.5px", fontWeight: 400, opacity: 0.9, transition: "opacity 0.2s" }}
+                                                       onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                                                       onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.9")}
+                                                    >
+                                                        {typeof item === "string" ? item : (item as { label: string; hasArrow?: boolean }).label}
+                                                    </a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", padding: "16px 40px" }}>
+                            <div style={{ display: "flex", justifyContent: "center", gap: "36px", marginBottom: "12px" }}>
+                                {bottomLinks.map((link) => (
+                                    <a key={link} href="#" style={{ color: "#d4a820", fontSize: "13px", fontWeight: 600, textDecoration: "none", letterSpacing: "0.02em", transition: "opacity 0.2s" }}
+                                       onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
+                                       onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                                    >{link}</a>
+                                ))}
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ display: "flex", gap: "24px" }}>
+                                    {footerLeft.map((link) => (
+                                        <a key={link} href="#" style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px", textDecoration: "none", transition: "color 0.2s" }}
+                                           onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.85)")}
+                                           onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+                                        >{link}</a>
+                                    ))}
+                                </div>
+                                <div style={{ display: "flex", gap: "24px" }}>
+                                    {footerRight.map((link) => (
+                                        <a key={link} href="#" style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px", textDecoration: "none", transition: "color 0.2s" }}
+                                           onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.85)")}
+                                           onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.5)")}
+                                        >{link}</a>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right bleed */}
+                    <div style={{ flex: "0 0 6%", position: "relative", overflow: "hidden" }}>
+                        <Image src="school_bg.jpg" alt="" fill unoptimized style={{ objectFit: "cover", objectPosition: "right center", filter: "brightness(0.55)" }} />
+                    </div>
+                </div>
+            )}
+
+        </main>
+    );
 }
