@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 // ══════════════════════════════════════════════════════════════════
 //  ▶  CHANGE THESE TWO VARIABLES ONLY
@@ -107,10 +108,12 @@ export default function HomePage() {
                 </div>
                 {/* Actions */}
                 <div style={{display:"flex",alignItems:"center",gap:20}}>
-                    <button style={{padding:"10px 28px",border:"1.5px solid rgba(255,255,255,0.85)",borderRadius:999,background:"transparent",color:"white",fontSize:10,fontWeight:700,letterSpacing:"0.2em",cursor:"pointer",transition:"all 0.3s"}}
-                            onMouseEnter={e=>{e.currentTarget.style.background="white";e.currentTarget.style.color="#111";}}
-                            onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="white";}}
-                    >ENQUIRE NOW</button>
+                    <Link href="/login">
+                        <button style={{padding:"10px 28px",border:"1.5px solid rgba(255,255,255,0.85)",borderRadius:999,background:"transparent",color:"white",fontSize:10,fontWeight:700,letterSpacing:"0.2em",cursor:"pointer",transition:"all 0.3s"}}
+                                onMouseEnter={e=>{e.currentTarget.style.background="white";e.currentTarget.style.color="#111";}}
+                                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="white";}}
+                        >SIGN IN</button>
+                    </Link>
                     <button onClick={()=>setSearchOpen(true)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.8)",display:"flex",padding:6}}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7.5"/><line x1="17" y1="17" x2="22" y2="22"/></svg>
                     </button>
