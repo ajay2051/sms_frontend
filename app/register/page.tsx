@@ -6,6 +6,9 @@ import Link from "next/link";
 
 const LOGO_SRC = "/logo.png";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
+const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION;
+
 function SchoolLogo({ width = 46, height = 52 }: { width?: number; height?: number }) {
     return <Image src={LOGO_SRC} alt="School logo" width={width} height={height} style={{ objectFit: "contain" }} />;
 }
@@ -101,7 +104,7 @@ export default function RegisterPage() {
         if (!validate()) return;
         setLoading(true);
         try {
-            const res = await fetch("http://127.0.0.1:8000/api/v1/auth/create_users/", {
+            const res = await fetch(`${BASE_URL}${API_VERSION}/auth/create_users/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password, role }),
