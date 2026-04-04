@@ -78,8 +78,13 @@ export default function SignInPage() {
             localStorage.setItem("refresh_token", data.refresh);
             localStorage.setItem("user",          JSON.stringify(data.user));
             showToast(data.message || "Successfully Logged In", "success");
-            setTimeout(() => { window.location.href = "/"; }, 1500);
-        } catch {
+            setTimeout(() => {
+                if (data.user?.role === "staff") {
+                    window.location.href = "/dashboard";
+                } else {
+                    window.location.href = "/";
+                }
+            }, 1500);        } catch {
             showToast("Unable to connect to server. Please try again.", "error");
         } finally {
             setLoading(false);
