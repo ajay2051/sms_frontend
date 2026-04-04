@@ -7,7 +7,7 @@ import Link from "next/link";
 // ══════════════════════════════════════════════════════════════════
 //  ▶  CHANGE THESE TWO VARIABLES ONLY
 // ══════════════════════════════════════════════════════════════════
-const LOGO_SRC    = "/logo.png";        // your school logo image
+const LOGO_SRC    = "/logo.png";        // school logo image
 const HERO_BG_SRC = "/school_bg.jpg";   // hero background image
 // ══════════════════════════════════════════════════════════════════
 
@@ -16,7 +16,7 @@ type NavTab = typeof NAV_TABS[number];
 
 const menuData = {
     Academic: ["Introduction","Grades 6 to 10","Grades 11 and 12","Learning Support","Academic Results","Careers and University Guidance","Unique Collaborations","Global Campus"],
-    Boarding: ["Introduction","Daily Life at Academia","Weekends","Our Boarding Houses","Boarding House Team","Health and Wellbeing","High Expectations"],
+    Admissions: ["Online Admission", "Online Fee Payment"],
     "Co-curricular": ["Introduction","The Hub","School Challenges","Creative and Performing Arts",{label:"Sports",hasArrow:true},"Outdoor Education","Trips",{label:"Clubs and Activities",hasArrow:true}],
     "About Us": ["Our Heritage","Our Senior Leadership Team","Nord Anglia Education","The Good Schools Guide","News and Events","Careers","Term Dates","Contact Us"],
 };
@@ -80,6 +80,10 @@ export default function HomePage() {
     const [query,setQuery]           = useState("");
     const [navScrolled,setNavScrolled] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    useEffect(() => {
+        setIsLoggedIn(!!localStorage.getItem("access_token"));
+    }, []);
 
     useEffect(()=>{const fn=()=>setNavScrolled(window.scrollY>60);window.addEventListener("scroll",fn);return()=>window.removeEventListener("scroll",fn);},[]);
     useEffect(()=>{if(searchOpen)setTimeout(()=>searchInputRef.current?.focus(),80);else setQuery("");},[searchOpen]);
@@ -108,12 +112,49 @@ export default function HomePage() {
                 </div>
                 {/* Actions */}
                 <div style={{display:"flex",alignItems:"center",gap:20}}>
-                    <Link href="/login">
-                        <button style={{padding:"10px 28px",border:"1.5px solid rgba(255,255,255,0.85)",borderRadius:999,background:"transparent",color:"white",fontSize:10,fontWeight:700,letterSpacing:"0.2em",cursor:"pointer",transition:"all 0.3s"}}
+                    {isLoggedIn ? (
+                        <button
+                            onClick={() => {
+                                localStorage.removeItem("access_token");
+                                localStorage.removeItem("refresh_token");
+                                localStorage.removeItem("user");
+                                setIsLoggedIn(false);
+                            }}
+                            style={{
+                                padding:"10px 28px",
+                                border:"1.5px solid rgba(255,255,255,0.85)",
+                                borderRadius:999,
+                                background:"transparent",
+                                color:"white",
+                                fontSize:10,
+                                fontWeight:700,
+                                letterSpacing:"0.2em",
+                                cursor:"pointer",
+                                transition:"all 0.3s"
+                            }}
+                            onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.15)";e.currentTarget.style.borderColor="white";}}
+                            onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="rgba(255,255,255,0.85)";}}
+                        >SIGN OUT</button>
+                    ) : (
+                        <Link href="/login">
+                            <button
+                                style={{
+                                    padding:"10px 28px",
+                                    border:"1.5px solid rgba(255,255,255,0.85)",
+                                    borderRadius:999,
+                                    background:"transparent",
+                                    color:"white",
+                                    fontSize:10,
+                                    fontWeight:700,
+                                    letterSpacing:"0.2em",
+                                    cursor:"pointer",
+                                    transition:"all 0.3s"
+                                }}
                                 onMouseEnter={e=>{e.currentTarget.style.background="white";e.currentTarget.style.color="#111";}}
                                 onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="white";}}
-                        >SIGN IN</button>
-                    </Link>
+                            >SIGN IN</button>
+                        </Link>
+                    )}
                     <button onClick={()=>setSearchOpen(true)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.8)",display:"flex",padding:6}}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7.5"/><line x1="17" y1="17" x2="22" y2="22"/></svg>
                     </button>
@@ -553,23 +594,54 @@ export default function HomePage() {
                         <div style={{height:1,background:"rgba(255,255,255,0.1)",margin:"0 40px"}}/>
                         <div style={{flex:1,overflowY:"auto",padding:"28px 40px 20px"}}>
                             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 24px",marginBottom:32}}>
-                                {(["Academic","Boarding","Co-curricular"] as const).map(section=>(
+
+                                {/* Academic & Co-curricular — always visible */}
+                                {(["Academic","Co-curricular"] as const).map(section=>(
                                     <div key={section} style={{display:"flex",alignItems:"flex-start",gap:16}}>
-                                        <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,minHeight:100,fontFamily:"Georgia,serif"}}>{section}</div>
-                                        <ul style={{listStyle:"none",padding:0,margin:0,display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
+                                        <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",
+                                            fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,
+                                            minHeight:100,fontFamily:"Georgia,serif"}}>{section}</div>
+                                        <ul style={{listStyle:"none",padding:0,margin:0,
+                                            display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
                                             {menuData[section].map((item,i)=>{
                                                 const isObj=typeof item==="object";
                                                 const label=isObj?item.label:item;
                                                 const hasArrow=isObj&&item.hasArrow;
                                                 return(
-                                                    <li key={i}><a href="#" style={{color:"white",textDecoration:"none",fontSize:"13.5px",display:"flex",alignItems:"center",gap:6,opacity:0.9}}
-                                                                   onMouseEnter={e=>(e.currentTarget.style.opacity="1")} onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
-                                                    >{label}{hasArrow&&<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{opacity:0.7}}><polyline points="9 18 15 12 9 6"/></svg>}</a></li>
+                                                    <li key={i}><a href="#" style={{color:"white",textDecoration:"none",
+                                                        fontSize:"13.5px",display:"flex",alignItems:"center",gap:6,opacity:0.9}}
+                                                                   onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
+                                                                   onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
+                                                    >{label}{hasArrow&&<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                                            stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                                                                            style={{opacity:0.7}}><polyline points="9 18 15 12 9 6"/></svg>}</a></li>
                                                 );
                                             })}
                                         </ul>
                                     </div>
                                 ))}
+
+                                {/* Admissions — ONLY visible when access_token exists in localStorage */}
+                                {isLoggedIn && (
+                                    <div style={{display:"flex",alignItems:"flex-start",gap:16}}>
+                                        <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",
+                                            fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,
+                                            minHeight:100,fontFamily:"Georgia,serif"}}>Admissions</div>
+                                        <ul style={{listStyle:"none",padding:0,margin:0,
+                                            display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
+                                            {menuData["Admissions"].map((item,i)=>(
+                                                <li key={i}>
+                                                    <a href="#" style={{color:"white",textDecoration:"none",fontSize:"13.5px",
+                                                        display:"flex",alignItems:"center",gap:6,opacity:0.9}}
+                                                       onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
+                                                       onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
+                                                    >{item}</a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
                             </div>
                             <div style={{height:1,background:"rgba(255,255,255,0.08)",marginBottom:28}}/>
                             <>
@@ -587,15 +659,15 @@ export default function HomePage() {
                                 </div>
                             </>
                         </div>
-                        <div style={{borderTop:"1px solid rgba(255,255,255,0.1)",padding:"16px 40px"}}>
-                            <div style={{display:"flex",justifyContent:"center",gap:36,marginBottom:12}}>
-                                {BOTTOM_LINKS.map(link=><a key={link} href="#" style={{color:"#d4a820",fontSize:13,fontWeight:600,textDecoration:"none"}} onMouseEnter={e=>(e.currentTarget.style.opacity="0.75")} onMouseLeave={e=>(e.currentTarget.style.opacity="1")}>{link}</a>)}
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between"}}>
-                                <div style={{display:"flex",gap:24}}>{FOOTER_LEFT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>
-                                <div style={{display:"flex",gap:24}}>{FOOTER_RIGHT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>
-                            </div>
-                        </div>
+                        {/*<div style={{borderTop:"1px solid rgba(255,255,255,0.1)",padding:"16px 40px"}}>*/}
+                        {/*    <div style={{display:"flex",justifyContent:"center",gap:36,marginBottom:12}}>*/}
+                        {/*        {BOTTOM_LINKS.map(link=><a key={link} href="#" style={{color:"#d4a820",fontSize:13,fontWeight:600,textDecoration:"none"}} onMouseEnter={e=>(e.currentTarget.style.opacity="0.75")} onMouseLeave={e=>(e.currentTarget.style.opacity="1")}>{link}</a>)}*/}
+                        {/*    </div>*/}
+                        {/*    <div style={{display:"flex",justifyContent:"space-between"}}>*/}
+                        {/*        <div style={{display:"flex",gap:24}}>{FOOTER_LEFT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>*/}
+                        {/*        <div style={{display:"flex",gap:24}}>{FOOTER_RIGHT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>*/}
+                        {/*    </div>*/}
+                        {/*</div>*/}
                     </div>
                     <div style={{flex:"0 0 6%",background:"linear-gradient(180deg,#8ab5cc,#3a6a80,#1a3a50)"}}/>
                 </div>
