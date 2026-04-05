@@ -629,15 +629,22 @@ export default function HomePage() {
                                             minHeight:100,fontFamily:"Georgia,serif"}}>Admissions</div>
                                         <ul style={{listStyle:"none",padding:0,margin:0,
                                             display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
-                                            {menuData["Admissions"].map((item,i)=>(
-                                                <li key={i}>
-                                                    <a href="#" style={{color:"white",textDecoration:"none",fontSize:"13.5px",
-                                                        display:"flex",alignItems:"center",gap:6,opacity:0.9}}
-                                                       onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
-                                                       onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
-                                                    >{item}</a>
-                                                </li>
-                                            ))}
+                                            {menuData["Admissions"].map((item,i)=>{
+                                                const href = item === "Online Admission"
+                                                    ? "/admissions"
+                                                    : item === "Online Fee Payment"
+                                                        ? "/payment"
+                                                        : "#";
+                                                return (
+                                                    <li key={i}>
+                                                        <a href={href} style={{color:"white",textDecoration:"none",fontSize:"13.5px",
+                                                            display:"flex",alignItems:"center",gap:6,opacity:0.9}}
+                                                           onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
+                                                           onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
+                                                        >{item}</a>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     </div>
                                 )}
