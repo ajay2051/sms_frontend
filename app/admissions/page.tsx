@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {useStudentAuthGuard} from "@/hooks/useStudentAuthGuard";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
@@ -7,7 +8,7 @@ const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
 const SPECIAL_CHARS = new Set('@_!#$%^&*()<>?/\\|}{~:'.split(''));
 
-/* ── Types ──────────────────────────────────────────────────────────────── */
+/* ── Types ──────────────────────────────────────────────────────────── */
 interface FormData {
     full_name: string;
     phone_number: string;
@@ -23,7 +24,7 @@ interface FormData {
 }
 interface FormErrors { [key: string]: string; }
 
-/* ── Validators ─────────────────────────────────────────────────────────── */
+/* ── Validators ─────────────────────────────────────────────────────── */
 function validateFullName(v: string) {
     if (v.length < 3 || v.length > 50) return "Must be between 3 and 50 characters";
     if ([...v].some(c => SPECIAL_CHARS.has(c))) return "Must not contain special characters";
@@ -67,7 +68,7 @@ function validateAll(form: FormData): FormErrors {
     return e;
 }
 
-/* ── Error message ──────────────────────────────────────────────────────── */
+/* ── Error message ──────────────────────────────────────────────────── */
 function ErrorMsg({ msg }: { msg?: string }) {
     if (!msg) return null;
     return (
@@ -80,7 +81,7 @@ function ErrorMsg({ msg }: { msg?: string }) {
     );
 }
 
-/* ── Field wrapper ──────────────────────────────────────────────────────── */
+/* ── Field wrapper ──────────────────────────────────────────────────── */
 function Field({ label, error, required = true, children }: {
     label: string; error?: string; required?: boolean; children: React.ReactNode;
 }) {
@@ -99,7 +100,7 @@ function Field({ label, error, required = true, children }: {
     );
 }
 
-/* ── Input style helper ─────────────────────────────────────────────────── */
+/* ── Input style helper ─────────────────────────────────────────────── */
 const inputStyle = (hasError?: boolean): React.CSSProperties => ({
     width: "100%",
     padding: "0.6rem 0.875rem",
@@ -114,7 +115,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
     transition: "border-color 0.2s, box-shadow 0.2s",
 });
 
-/* ── Section card ───────────────────────────────────────────────────────── */
+/* ── Section card ───────────────────────────────────────────────────── */
 function SectionCard({ icon, title, children }: {
     icon: React.ReactNode; title: string; children: React.ReactNode;
 }) {
@@ -144,9 +145,11 @@ function SectionCard({ icon, title, children }: {
     );
 }
 
-/* ── Main page ──────────────────────────────────────────────────────────── */
+/* ── Main page ──────────────────────────────────────────────────────── */
 export default function AdmissionsPage() {
-    useStudentAuthGuard()
+    useStudentAuthGuard();
+    const router = useRouter();
+
     const [form, setForm] = useState<FormData>({
         full_name: "", phone_number: "", student_class: "", year: "",
         address: "", parents_name: "", relation: "", parents_phone_number: "",
@@ -154,7 +157,6 @@ export default function AdmissionsPage() {
     });
     const [errors,     setErrors]     = useState<FormErrors>({});
     const [submitting, setSubmitting] = useState(false);
-    const [success,    setSuccess]    = useState(false);
     const [apiError,   setApiError]   = useState("");
 
     const certRef = useRef<HTMLInputElement>(null);
@@ -196,49 +198,15 @@ export default function AdmissionsPage() {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data?.detail ?? `Error ${res.status}`);
             }
-            setSuccess(true);
+            // ── Redirect to payment page with student id from response ──
+            const studentData = await res.json();
+            router.push(`/payment?student_id=${studentData.id}`);
         } catch (err: any) {
             setApiError(err.message ?? "Something went wrong");
         } finally {
             setSubmitting(false);
         }
     }
-
-    /* ── Success screen ── */
-    if (success) return (
-        <div style={{
-            minHeight: "100vh", background: "var(--navy-900)",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: "1.25rem", textAlign: "center", padding: "2rem",
-        }} className="animate-fade-up">
-            <div style={{
-                width: 72, height: 72, borderRadius: "9999px",
-                background: "linear-gradient(135deg, var(--sky-400), var(--navy-700))",
-                display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                </svg>
-            </div>
-            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.75rem", fontWeight: 700, color: "var(--white)" }}>
-                Application Submitted
-            </h1>
-            <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.5)", maxWidth: 340, lineHeight: 1.75 }}>
-                Your admission application has been received. We will be in touch shortly.
-            </p>
-            <button
-                onClick={() => setSuccess(false)}
-                style={{
-                    padding: "0.65rem 1.75rem", borderRadius: "9999px",
-                    background: "rgba(255,255,255,0.08)", color: "var(--white)",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer",
-                }}
-            >
-                Submit Another
-            </button>
-        </div>
-    );
 
     const grid2: React.CSSProperties = {
         display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem",
@@ -277,7 +245,7 @@ export default function AdmissionsPage() {
 
                 <form onSubmit={handleSubmit} noValidate>
 
-                    {/* ── Student Info ── */}
+                    {/* Student Info */}
                     <div className="animate-fade-up delay-100">
                         <SectionCard
                             title="Student Information"
@@ -372,7 +340,7 @@ export default function AdmissionsPage() {
                                                 {form.profile_pic ? form.profile_pic.name : "Click to upload profile photo"}
                                             </span>
                                             <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)" }}>
-                                                JPG, PNG — max 5 MB
+                                                JPG, PNG · max 5 MB
                                             </span>
                                         </div>
                                         <input
@@ -386,7 +354,7 @@ export default function AdmissionsPage() {
                         </SectionCard>
                     </div>
 
-                    {/* ── Parent Info ── */}
+                    {/* Parent Info */}
                     <div className="animate-fade-up delay-200">
                         <SectionCard
                             title="Parent / Guardian Information"
@@ -442,7 +410,7 @@ export default function AdmissionsPage() {
                         </SectionCard>
                     </div>
 
-                    {/* ── Certificates ── */}
+                    {/* Certificates */}
                     <div className="animate-fade-up delay-300">
                         <SectionCard
                             title="Certificates & Documents"
@@ -484,7 +452,7 @@ export default function AdmissionsPage() {
                                     Click to select certificates
                                 </span>
                                 <span style={{ fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.25)" }}>
-                                    JPG, JPEG, PNG, PDF — max 5 MB each — multiple allowed
+                                    JPG, JPEG, PNG, PDF · max 5 MB each · multiple allowed
                                 </span>
                             </div>
 
@@ -538,7 +506,7 @@ export default function AdmissionsPage() {
                         </SectionCard>
                     </div>
 
-                    {/* ── Submit ── */}
+                    {/* Submit */}
                     <div className="animate-fade-up delay-400" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.75rem", marginTop: "0.5rem" }}>
                         {apiError && (
                             <div style={{
