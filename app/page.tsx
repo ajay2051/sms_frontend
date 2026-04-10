@@ -633,7 +633,7 @@ export default function HomePage() {
                                                 const href = item === "Online Admission"
                                                     ? "/admissions"
                                                     : item === "Online Fee Payment"
-                                                        ? "/payment"
+                                                        ? "/payment?from=fee"
                                                         : "#";
                                                 return (
                                                     <li key={i}>
