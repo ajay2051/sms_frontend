@@ -4,15 +4,23 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-// ══════════════════════════════════════════════════════════════════
-//  ▶  CHANGE THESE TWO VARIABLES ONLY
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+//  ★  CHANGE THESE TWO VARIABLES ONLY
+// ══════════════════════════════════════════════════
 const LOGO_SRC    = "/logo.png";        // school logo image
 const HERO_BG_SRC = "/school_bg.jpg";   // hero background image
-// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
 
 const NAV_TABS = ["HOME", "ACADEMIC", "BOARDING", "CO-CURRICULAR"] as const;
 type NavTab = typeof NAV_TABS[number];
+
+// Section IDs for anchor-link navigation
+const TAB_SECTION_MAP: Record<NavTab, string> = {
+    HOME:           "section-hero",
+    ACADEMIC:       "section-academic",
+    BOARDING:       "section-boarding",
+    "CO-CURRICULAR":"section-cocurricular",
+};
 
 const menuData = {
     Academic: ["Introduction","Grades 6 to 10","Grades 11 and 12","Learning Support","Academic Results","Careers and University Guidance","Unique Collaborations","Global Campus"],
@@ -22,7 +30,7 @@ const menuData = {
 };
 
 const allPages = [
-    ...Object.entries(menuData).flatMap(([section,items]) => items.map((item) => ({title:typeof item==="string"?item:item.label,section,description:`${section} — Academia`}))),
+    ...Object.entries(menuData).flatMap(([section,items]) => items.map((item) => ({title:typeof item==="string"?item:item.label,section,description:`${section} · Academia`}))),
     {title:"Admissions",section:"Admissions",description:"How to apply"},
     {title:"Summer Camp",section:"Summer Camp",description:"Summer programmes"},
     {title:"Legal Notice",section:"Legal",description:"Legal information"},
@@ -30,10 +38,8 @@ const allPages = [
     {title:"Accessibility",section:"Legal",description:"Accessibility statement"},
 ];
 
-const BOTTOM_LINKS  = ["About Us","News and Events","Admissions","Summer Camp","Contact Us"];
 const FOOTER_LEFT   = ["Careers","Term Dates"];
 const FOOTER_RIGHT  = ["Legal Notice","Privacy Policy","Accessibility"];
-const POPULAR_PAGES = ["Admissions","Boarding","Summer Camp","Academic Results","Contact Us","Term Dates"];
 
 function Highlight({text,query}:{text:string;query:string}) {
     if(!query.trim()) return <>{text}</>;
@@ -42,7 +48,6 @@ function Highlight({text,query}:{text:string;query:string}) {
     return <>{text.slice(0,idx)}<mark style={{background:"#d4a820",color:"#0d2245",borderRadius:2,padding:"0 2px"}}>{text.slice(idx,idx+query.length)}</mark>{text.slice(idx+query.length)}</>;
 }
 
-// Single logo component — swap LOGO_SRC at the top
 function SchoolLogo({width=46,height=52}:{width?:number;height?:number}) {
     return <Image src={LOGO_SRC} alt="School logo" width={width} height={height} style={{objectFit:"contain"}} />;
 }
@@ -75,22 +80,41 @@ function SlideBtns() {
 export default function HomePage() {
     const [activeLang,setActiveLang] = useState<"EN"|"FR">("EN");
     const [activeTab,setActiveTab]   = useState<NavTab>("HOME");
-    const [menuOpen,setMenuOpen]     = useState(false);
-    const [searchOpen,setSearchOpen] = useState(false);
-    const [query,setQuery]           = useState("");
     const [navScrolled,setNavScrolled] = useState(false);
-    const searchInputRef = useRef<HTMLInputElement>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+
     useEffect(() => {
         setIsLoggedIn(!!localStorage.getItem("access_token"));
     }, []);
 
     useEffect(()=>{const fn=()=>setNavScrolled(window.scrollY>60);window.addEventListener("scroll",fn);return()=>window.removeEventListener("scroll",fn);},[]);
-    useEffect(()=>{if(searchOpen)setTimeout(()=>searchInputRef.current?.focus(),80);else setQuery("");},[searchOpen]);
-    useEffect(()=>{const fn=(e:KeyboardEvent)=>{if(e.key==="Escape"){setSearchOpen(false);setMenuOpen(false);}};window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);},[]);
-    useEffect(()=>{document.body.style.overflow=(menuOpen||searchOpen)?"hidden":"";return()=>{document.body.style.overflow="";};},[menuOpen,searchOpen]);
 
-    const searchResults = query.trim().length>1 ? allPages.filter(p=>p.title.toLowerCase().includes(query.toLowerCase())||p.section.toLowerCase().includes(query.toLowerCase())) : [];
+    // Scroll to section and set active tab
+    const handleTabClick = (tab: NavTab) => {
+        setActiveTab(tab);
+        const sectionId = TAB_SECTION_MAP[tab];
+        const el = document.getElementById(sectionId);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    };
+
+    // Update active tab based on scroll position
+    useEffect(() => {
+        const handleScroll = () => {
+            setNavScrolled(window.scrollY > 60);
+            const tabs = (Object.entries(TAB_SECTION_MAP) as [NavTab, string][]);
+            for (let i = tabs.length - 1; i >= 0; i--) {
+                const el = document.getElementById(tabs[i][1]);
+                if (el && window.scrollY >= el.offsetTop - 200) {
+                    setActiveTab(tabs[i][0]);
+                    break;
+                }
+            }
+        };
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     return (
         <>
@@ -104,14 +128,33 @@ export default function HomePage() {
                         <button key={lang} onClick={()=>setActiveLang(lang)} style={{background:"none",border:"none",borderBottom:activeLang===lang?"2px solid #facc15":"2px solid transparent",padding:"2px 2px 3px",color:activeLang===lang?"white":"rgba(255,255,255,0.5)",fontSize:11,fontWeight:700,letterSpacing:"0.15em",cursor:"pointer"}}>{lang}</button>
                     ))}
                 </div>
-                {/* Logo — change LOGO_SRC at top of file */}
+
+                {/* Logo */}
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
                     <SchoolLogo width={40} height={44} />
                     <p style={{fontFamily:"Georgia,serif",color:"white",fontSize:17,letterSpacing:"0.18em",margin:"4px 0 0"}}>Academia</p>
                     <p style={{color:"rgba(255,255,255,0.5)",fontSize:8,letterSpacing:"0.22em",textTransform:"uppercase",margin:"2px 0 0"}}>Collège Alpin International</p>
                 </div>
+
                 {/* Actions */}
-                <div style={{display:"flex",alignItems:"center",gap:20}}>
+                <div style={{display:"flex",alignItems:"center",gap:16}}>
+                    {/* Auth-gated links */}
+                    {isLoggedIn && (
+                        <>
+                            <Link href="/admissions" style={{color:"rgba(255,255,255,0.85)",fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",textDecoration:"none",padding:"6px 0",borderBottom:"1.5px solid transparent",transition:"all 0.2s"}}
+                                  onMouseEnter={e=>(e.currentTarget.style.borderBottomColor="#facc15")}
+                                  onMouseLeave={e=>(e.currentTarget.style.borderBottomColor="transparent")}
+                            >ONLINE ADMISSION</Link>
+                            <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>|</span>
+                            <Link href="/payment?from=fee" style={{color:"rgba(255,255,255,0.85)",fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",textDecoration:"none",padding:"6px 0",borderBottom:"1.5px solid transparent",transition:"all 0.2s"}}
+                                  onMouseEnter={e=>(e.currentTarget.style.borderBottomColor="#facc15")}
+                                  onMouseLeave={e=>(e.currentTarget.style.borderBottomColor="transparent")}
+                            >ONLINE FEE PAYMENT</Link>
+                            <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>|</span>
+                        </>
+                    )}
+
+                    {/* Sign In / Sign Out */}
                     {isLoggedIn ? (
                         <button
                             onClick={() => {
@@ -120,55 +163,24 @@ export default function HomePage() {
                                 localStorage.removeItem("user");
                                 setIsLoggedIn(false);
                             }}
-                            style={{
-                                padding:"10px 28px",
-                                border:"1.5px solid rgba(255,255,255,0.85)",
-                                borderRadius:999,
-                                background:"transparent",
-                                color:"white",
-                                fontSize:10,
-                                fontWeight:700,
-                                letterSpacing:"0.2em",
-                                cursor:"pointer",
-                                transition:"all 0.3s"
-                            }}
+                            style={{padding:"10px 28px",border:"1.5px solid rgba(255,255,255,0.85)",borderRadius:999,background:"transparent",color:"white",fontSize:10,fontWeight:700,letterSpacing:"0.2em",cursor:"pointer",transition:"all 0.3s"}}
                             onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,0.15)";e.currentTarget.style.borderColor="white";}}
                             onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="rgba(255,255,255,0.85)";}}
                         >SIGN OUT</button>
                     ) : (
                         <Link href="/login">
                             <button
-                                style={{
-                                    padding:"10px 28px",
-                                    border:"1.5px solid rgba(255,255,255,0.85)",
-                                    borderRadius:999,
-                                    background:"transparent",
-                                    color:"white",
-                                    fontSize:10,
-                                    fontWeight:700,
-                                    letterSpacing:"0.2em",
-                                    cursor:"pointer",
-                                    transition:"all 0.3s"
-                                }}
+                                style={{padding:"10px 28px",border:"1.5px solid rgba(255,255,255,0.85)",borderRadius:999,background:"transparent",color:"white",fontSize:10,fontWeight:700,letterSpacing:"0.2em",cursor:"pointer",transition:"all 0.3s"}}
                                 onMouseEnter={e=>{e.currentTarget.style.background="white";e.currentTarget.style.color="#111";}}
                                 onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="white";}}
                             >SIGN IN</button>
                         </Link>
                     )}
-                    <button onClick={()=>setSearchOpen(true)} style={{background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,0.8)",display:"flex",padding:6}}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7.5"/><line x1="17" y1="17" x2="22" y2="22"/></svg>
-                    </button>
-                    <button onClick={()=>setMenuOpen(true)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",gap:5,padding:6,color:"rgba(255,255,255,0.8)"}}>
-                        <span style={{display:"block",width:22,height:1.5,background:"currentColor"}}/>
-                        <span style={{display:"block",width:22,height:1.5,background:"currentColor"}}/>
-                        <span style={{display:"block",width:22,height:1.5,background:"currentColor"}}/>
-                    </button>
-                    <span style={{color:"rgba(255,255,255,0.6)",fontSize:10,fontWeight:700,letterSpacing:"0.2em"}}>MENU</span>
                 </div>
             </nav>
 
             {/* ═══════════════════════════════════════
-          FIXED EXPLORE TAB BAR — bottom of viewport, one instance only
+          FIXED EXPLORE TAB BAR — tabs now scroll to sections
       ═══════════════════════════════════════ */}
             <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:"rgba(9,26,56,0.92)",backdropFilter:"blur(10px)",borderTop:"1px solid rgba(255,255,255,0.1)",display:"flex",alignItems:"center",justifyContent:"center",padding:"14px 32px"}}>
                 <span style={{color:"rgba(255,255,255,0.45)",fontSize:10,letterSpacing:"0.32em",textTransform:"uppercase",marginRight:40,fontWeight:500,flexShrink:0}}>EXPLORE</span>
@@ -176,10 +188,28 @@ export default function HomePage() {
                     {NAV_TABS.map((tab,i)=>(
                         <div key={tab} style={{display:"flex",alignItems:"center"}}>
                             {i>0&&<div style={{height:1,width:50,margin:"0 8px",background:"linear-gradient(to right,rgba(200,168,75,0.25),rgba(200,168,75,0.65),rgba(200,168,75,0.25))"}}/>}
-                            <button onClick={()=>setActiveTab(tab)} style={{padding:"9px 24px",borderRadius:999,cursor:"pointer",whiteSpace:"nowrap",transition:"all 0.25s",fontSize:11,fontWeight:600,letterSpacing:"0.18em",textTransform:"uppercase",border:activeTab===tab?"1.5px solid white":"1.5px solid rgba(255,255,255,0.35)",background:activeTab===tab?"white":"transparent",color:activeTab===tab?"#111827":"rgba(255,255,255,0.78)"}}
-                                    onMouseEnter={e=>{if(activeTab!==tab){e.currentTarget.style.borderColor="rgba(255,255,255,0.7)";e.currentTarget.style.color="white";}}}
-                                    onMouseLeave={e=>{if(activeTab!==tab){e.currentTarget.style.borderColor="rgba(255,255,255,0.35)";e.currentTarget.style.color="rgba(255,255,255,0.78)";}}}
-                            >{tab}</button>
+                            <a
+                                href={`#${TAB_SECTION_MAP[tab]}`}
+                                onClick={(e)=>{e.preventDefault();handleTabClick(tab);}}
+                                style={{
+                                    display:"inline-block",
+                                    padding:"9px 24px",
+                                    borderRadius:999,
+                                    cursor:"pointer",
+                                    whiteSpace:"nowrap",
+                                    transition:"all 0.25s",
+                                    fontSize:11,
+                                    fontWeight:600,
+                                    letterSpacing:"0.18em",
+                                    textTransform:"uppercase",
+                                    textDecoration:"none",
+                                    border:activeTab===tab?"1.5px solid white":"1.5px solid rgba(255,255,255,0.35)",
+                                    background:activeTab===tab?"white":"transparent",
+                                    color:activeTab===tab?"#111827":"rgba(255,255,255,0.78)",
+                                }}
+                                onMouseEnter={e=>{if(activeTab!==tab){(e.currentTarget as HTMLAnchorElement).style.borderColor="rgba(255,255,255,0.7)";(e.currentTarget as HTMLAnchorElement).style.color="white";}}}
+                                onMouseLeave={e=>{if(activeTab!==tab){(e.currentTarget as HTMLAnchorElement).style.borderColor="rgba(255,255,255,0.35)";(e.currentTarget as HTMLAnchorElement).style.color="rgba(255,255,255,0.78)";}}}
+                            >{tab}</a>
                         </div>
                     ))}
                 </div>
@@ -187,12 +217,11 @@ export default function HomePage() {
 
             {/* ═══════════════════════════════════════
           SCROLLABLE PAGE CONTENT
-          paddingBottom = height of explore bar so last section isn't hidden
       ═══════════════════════════════════════ */}
             <main style={{paddingBottom:72}}>
 
-                {/* ── HERO — add background image via HERO_BG_SRC ── */}
-                <section style={{position:"relative",height:"100vh",overflow:"hidden"}}>
+                {/* ★ HERO */}
+                <section id="section-hero" style={{position:"relative",height:"100vh",overflow:"hidden"}}>
                     <Image src={HERO_BG_SRC} alt="School campus" fill priority unoptimized style={{objectFit:"cover",objectPosition:"center"}} />
                     <div style={{position:"absolute",inset:0,zIndex:1,background:"linear-gradient(to bottom,rgba(0,0,0,0.22) 0%,transparent 40%,rgba(0,0,0,0.48) 100%)"}}/>
                     <div style={{position:"absolute",inset:0,zIndex:1,background:"linear-gradient(to right,rgba(0,0,0,0.1),transparent,rgba(0,0,0,0.1))"}}/>
@@ -213,7 +242,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── INTRO + SUMMER CAMP ── */}
+                {/* ★ INTRO + SUMMER CAMP */}
                 <section style={{display:"grid",gridTemplateColumns:"1fr 340px"}}>
                     <div style={{background:"white",padding:"88px 80px"}}>
                         <h2 style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:"clamp(1.6rem,2.8vw,2.2rem)",fontWeight:700,color:"#0c2044",lineHeight:1.3,marginBottom:36,maxWidth:680}}>One of the leading private boarding schools in Switzerland, Academia is home to a thriving international community of students aged 11 to 18.</h2>
@@ -254,12 +283,12 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── ACADEMIC ── */}
-                <section style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"#1690d8"}}>
+                {/* ★ ACADEMIC */}
+                <section id="section-academic" style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"#1690d8"}}>
                     <div style={{position:"absolute",left:0,top:0,bottom:0,width:"58%",overflow:"hidden"}}>
                         <div style={{position:"absolute",inset:0,background:"linear-gradient(160deg,#1a3a5c 0%,#2d6a9f 40%,#1a8fd1 70%,#3caee8 100%)"}}/>
                         <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",userSelect:"none"}}>
-                            <span style={{fontFamily:"Georgia,serif",fontWeight:700,lineHeight:0.8,color:"rgba(56,169,235,0.6)",letterSpacing:"-0.05em",fontSize:"clamp(12rem,20vw,17rem)"}}>""</span>
+                            <span style={{fontFamily:"Georgia,serif",fontWeight:700,lineHeight:0.8,color:"rgba(56,169,235,0.6)",letterSpacing:"-0.05em",fontSize:"clamp(12rem,20vw,17rem)"}}>"</span>
                         </div>
                         <div style={{position:"absolute",bottom:80,left:32,right:32,display:"grid",gridTemplateColumns:"repeat(8,1fr)",gap:10,transform:"perspective(900px) rotateY(5deg)"}}>
                             {[56,72,62,80,58,74,66,84,70,60,76,64,82,68,72,88].map((h,i)=>(
@@ -279,8 +308,8 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── BOARDING ── */}
-                <section style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"linear-gradient(160deg,#091a38 0%,#0e2550 60%,#153066 100%)"}}>
+                {/* ★ BOARDING */}
+                <section id="section-boarding" style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"linear-gradient(160deg,#091a38 0%,#0e2550 60%,#153066 100%)"}}>
                     <div style={{position:"absolute",left:0,top:0,bottom:0,width:"55%",overflow:"hidden"}}>
                         <svg style={{position:"absolute",left:"4%",top:0,height:"100%",width:"42%",opacity:0.5}} viewBox="0 0 200 500" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
                             <path d="M100 10 Q130 80 170 100 Q210 120 185 150 Q220 185 195 215 Q225 255 185 285 Q215 325 175 360 Q205 405 165 440 L135 440 L135 380 L145 380 L145 355 L105 355 L105 440 L75 440 L75 380 L85 380 L85 355 L65 355 Q25 405 35 440 L25 440 Q-15 400 10 360 Q-20 320 20 290 Q-10 255 30 225 Q-5 190 35 165 Q10 130 55 110 Q30 75 80 50Z" fill="#163470" opacity="0.9"/>
@@ -304,8 +333,8 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── CO-CURRICULAR ── */}
-                <section style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"#091a38"}}>
+                {/* ★ CO-CURRICULAR */}
+                <section id="section-cocurricular" style={{position:"relative",minHeight:"100vh",overflow:"hidden",background:"#091a38"}}>
                     <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,#87a5bb 0%,#6a8fa8 25%,#4a7090 50%,#2a5070 75%,#0a2040 100%)"}}/>
                     <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,#3a5a6a 0%,#1e3540 100%)",clipPath:"polygon(0% 100%,8% 50%,18% 70%,28% 25%,38% 55%,48% 10%,58% 45%,68% 30%,78% 60%,88% 35%,100% 55%,100% 100%)"}}/>
                     <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,transparent 0%,#0a2030 100%)",clipPath:"polygon(0% 100%,5% 68%,14% 78%,22% 52%,30% 72%,40% 44%,50% 68%,60% 50%,70% 72%,80% 52%,90% 70%,100% 58%,100% 100%)"}}/>
@@ -335,7 +364,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── ABOUT TEXT ── */}
+                {/* ★ ABOUT TEXT */}
                 <section style={{background:"white",padding:"88px 80px"}}>
                     <div style={{display:"flex",justifyContent:"center",marginBottom:40}}><Crest/></div>
                     <h2 style={{fontFamily:"Georgia,'Times New Roman',serif",fontSize:"clamp(1.35rem,2.5vw,1.875rem)",fontWeight:700,color:"#0c2044",textAlign:"center",lineHeight:1.3,maxWidth:760,margin:"0 auto 64px"}}>One of the leading private boarding schools in Switzerland, Academia is home to a thriving international community of students aged 11 to 18.</h2>
@@ -356,7 +385,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── LOCATION ── */}
+                {/* ★ LOCATION */}
                 <section style={{background:"#0c2044",overflow:"hidden"}}>
                     <div style={{padding:"64px 80px 48px",position:"relative",overflow:"hidden"}}>
                         <div style={{position:"absolute",top:-80,right:-64,width:384,height:384,borderRadius:"50%",background:"radial-gradient(circle,#1a8fd1,transparent)",opacity:0.2}}/>
@@ -382,7 +411,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── QUOTE + MOSAIC ── */}
+                {/* ★ QUOTE + MOSAIC */}
                 <section style={{background:"#f5f6fa",padding:"88px 80px",textAlign:"center"}}>
                     <div style={{display:"flex",justifyContent:"center",marginBottom:32}}><Crest/></div>
                     <blockquote style={{fontFamily:"Georgia,'Times New Roman',serif",fontStyle:"italic",color:"#0c2044",lineHeight:1.6,maxWidth:900,margin:"0 auto 20px",fontSize:"clamp(1.1rem,2vw,1.45rem)"}}>
@@ -397,7 +426,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── CAMPUS ── */}
+                {/* ★ CAMPUS */}
                 <section style={{background:"white",padding:"88px 80px",textAlign:"center"}}>
                     <div style={{display:"flex",justifyContent:"center",marginBottom:32}}><Crest/></div>
                     <p style={{fontFamily:"Georgia,'Times New Roman',serif",color:"#0c2044",lineHeight:1.7,maxWidth:820,margin:"0 auto 64px",fontSize:"clamp(1.05rem,1.7vw,1.3rem)"}}>Tucked away in an idyllic alpine village — and surrounded by magnificent mountain peaks, verdant pine forests, and big skies — our campus is an inspiring Swiss boarding school to live and learn.</p>
@@ -409,7 +438,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── ADMISSIONS ── */}
+                {/* ★ ADMISSIONS */}
                 <section style={{overflow:"hidden"}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 380px 1fr"}}>
                         <div style={{position:"relative",minHeight:520,overflow:"hidden",background:"linear-gradient(160deg,#1a3060,#0e2040)"}}>
@@ -458,7 +487,7 @@ export default function HomePage() {
                     </div>
                 </section>
 
-                {/* ── FOOTER ── */}
+                {/* ★ FOOTER */}
                 <footer style={{background:"#0c2044",color:"white",padding:"80px 80px 32px"}}>
                     <div style={{textAlign:"center",marginBottom:56}}>
                         <div style={{display:"flex",justifyContent:"center",marginBottom:12}}><SchoolLogo width={56} height={64}/></div>
@@ -501,184 +530,6 @@ export default function HomePage() {
                 </footer>
 
             </main>
-
-            {/* ═══════════════════════════════════════
-          SEARCH OVERLAY (fixed, z-index 200)
-      ═══════════════════════════════════════ */}
-            {searchOpen&&(
-                <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(8,16,32,0.92)",backdropFilter:"blur(16px)",display:"flex",flexDirection:"column",alignItems:"center"}}
-                     onClick={e=>{if(e.target===e.currentTarget)setSearchOpen(false);}}>
-                    <button onClick={()=>setSearchOpen(false)} style={{position:"absolute",top:24,right:32,background:"none",border:"none",color:"rgba(255,255,255,0.7)",cursor:"pointer",fontSize:28,lineHeight:1}}>✕</button>
-                    <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:60,marginBottom:40}}>
-                        <SchoolLogo/>
-                        <p style={{fontFamily:"Georgia,serif",color:"white",fontSize:16,letterSpacing:"0.16em",margin:"8px 0 2px"}}>Academia</p>
-                        <p style={{color:"rgba(255,255,255,0.45)",fontSize:11,letterSpacing:"0.18em",margin:0}}>Search</p>
-                    </div>
-                    <div style={{width:"100%",maxWidth:640,padding:"0 24px",position:"relative"}}>
-                        <div style={{position:"relative",display:"flex",alignItems:"center"}}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{position:"absolute",left:18,pointerEvents:"none",zIndex:1}}><circle cx="11" cy="11" r="7.5"/><line x1="17" y1="17" x2="22" y2="22"/></svg>
-                            <input ref={searchInputRef} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search pages, programmes, news…"
-                                   style={{width:"100%",padding:"18px 48px 18px 52px",borderRadius:999,border:"1.5px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.07)",color:"white",fontSize:16,outline:"none",boxSizing:"border-box"}}
-                                   onFocus={e=>{e.currentTarget.style.borderColor="#d4a820";}} onBlur={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.2)";}}
-                            />
-                            {query&&<button onClick={()=>{setQuery("");searchInputRef.current?.focus();}} style={{position:"absolute",right:18,background:"none",border:"none",color:"rgba(255,255,255,0.5)",cursor:"pointer",fontSize:18}}>✕</button>}
-                        </div>
-                    </div>
-                    <div style={{width:"100%",maxWidth:640,padding:"0 24px",marginTop:20,flex:1,overflowY:"auto"}}>
-                        {!query.trim()&&(
-                            <div>
-                                <p style={{color:"rgba(255,255,255,0.35)",fontSize:10,letterSpacing:"0.22em",textTransform:"uppercase",marginBottom:14,fontWeight:600}}>Popular Pages</p>
-                                <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
-                                    {POPULAR_PAGES.map(p=>(
-                                        <button key={p} onClick={()=>setQuery(p)} style={{padding:"8px 18px",borderRadius:999,border:"1px solid rgba(255,255,255,0.2)",background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.75)",fontSize:13,cursor:"pointer"}}
-                                                onMouseEnter={e=>{e.currentTarget.style.borderColor="#d4a820";e.currentTarget.style.color="#d4a820";}}
-                                                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,0.2)";e.currentTarget.style.color="rgba(255,255,255,0.75)";}}
-                                        >{p}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {query.trim().length>1&&(
-                            <div>
-                                <p style={{color:"rgba(255,255,255,0.35)",fontSize:10,letterSpacing:"0.22em",textTransform:"uppercase",marginBottom:14,fontWeight:600}}>{searchResults.length>0?`${searchResults.length} Result${searchResults.length!==1?"s":""}` :"No results found"}</p>
-                                <ul style={{listStyle:"none",padding:0,margin:0,display:"flex",flexDirection:"column",gap:4}}>
-                                    {searchResults.map((r,i)=>(
-                                        <li key={i}>
-                                            <a href="#" onClick={()=>setSearchOpen(false)} style={{display:"flex",alignItems:"center",gap:16,padding:"14px 16px",borderRadius:10,textDecoration:"none",background:"rgba(255,255,255,0.03)"}}
-                                               onMouseEnter={e=>(e.currentTarget.style.background="rgba(212,168,32,0.1)")}
-                                               onMouseLeave={e=>(e.currentTarget.style.background="rgba(255,255,255,0.03)")}
-                                            >
-                                                <div style={{width:34,height:34,borderRadius:8,background:"rgba(212,168,32,0.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4a820" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                </div>
-                                                <div style={{flex:1,minWidth:0}}>
-                                                    <p style={{color:"white",fontSize:14,fontWeight:500,margin:0}}><Highlight text={r.title} query={query}/></p>
-                                                    <p style={{color:"rgba(255,255,255,0.38)",fontSize:11,margin:"2px 0 0"}}><Highlight text={r.section} query={query}/></p>
-                                                </div>
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                    <div style={{padding:16,display:"flex",gap:20}}>
-                        {[["↵","to select"],["Esc","to close"]].map(([k,l])=>(
-                            <span key={k} style={{color:"rgba(255,255,255,0.25)",fontSize:11,display:"flex",alignItems:"center",gap:6}}>
-                <kbd style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:4,padding:"2px 6px",fontSize:10,fontFamily:"monospace"}}>{k}</kbd>{l}
-              </span>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* ═══════════════════════════════════════
-          MENU OVERLAY (fixed, z-index 100)
-      ═══════════════════════════════════════ */}
-            {menuOpen&&(
-                <div style={{position:"fixed",inset:0,zIndex:100,display:"flex"}}>
-                    <div style={{flex:"0 0 19%",position:"relative",overflow:"hidden",background:"linear-gradient(180deg,#6a9a80 0%,#3a6a50 40%,#1a3a28 100%)"}}>
-                        <svg style={{position:"absolute",bottom:0,left:0,width:"100%"}} viewBox="0 0 300 600" preserveAspectRatio="xMidYMax meet">
-                            <polygon points="60,600 60,300 20,350 60,250 30,300 80,180 130,300 100,250 140,350 100,300 100,600" fill="#1a3a28" opacity="0.8"/>
-                            <polygon points="200,600 200,350 160,400 200,300 170,350 220,220 270,350 240,300 280,400 240,350 240,600" fill="#152e20" opacity="0.9"/>
-                        </svg>
-                    </div>
-                    <div style={{flex:1,background:"#0d2245",display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
-                        <button onClick={()=>setMenuOpen(false)} style={{position:"absolute",top:22,right:28,background:"none",border:"none",color:"white",cursor:"pointer",fontSize:26,lineHeight:1,opacity:0.85}}>✕</button>
-                        <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:24,paddingBottom:20}}>
-                            <SchoolLogo/>
-                            <p style={{fontFamily:"Georgia,serif",color:"white",fontSize:17,letterSpacing:"0.16em",margin:"6px 0 0"}}>Academia</p>
-                            <p style={{fontFamily:"Georgia,serif",color:"rgba(255,255,255,0.6)",fontSize:8,letterSpacing:"0.22em",textTransform:"uppercase",margin:"3px 0 0"}}>Collège Alpin International</p>
-                        </div>
-                        <div style={{height:1,background:"rgba(255,255,255,0.1)",margin:"0 40px"}}/>
-                        <div style={{flex:1,overflowY:"auto",padding:"28px 40px 20px"}}>
-                            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 24px",marginBottom:32}}>
-
-                                {/* Academic & Co-curricular — always visible */}
-                                {(["Academic","Co-curricular"] as const).map(section=>(
-                                    <div key={section} style={{display:"flex",alignItems:"flex-start",gap:16}}>
-                                        <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",
-                                            fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,
-                                            minHeight:100,fontFamily:"Georgia,serif"}}>{section}</div>
-                                        <ul style={{listStyle:"none",padding:0,margin:0,
-                                            display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
-                                            {menuData[section].map((item,i)=>{
-                                                const isObj=typeof item==="object";
-                                                const label=isObj?item.label:item;
-                                                const hasArrow=isObj&&item.hasArrow;
-                                                return(
-                                                    <li key={i}><a href="#" style={{color:"white",textDecoration:"none",
-                                                        fontSize:"13.5px",display:"flex",alignItems:"center",gap:6,opacity:0.9}}
-                                                                   onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
-                                                                   onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
-                                                    >{label}{hasArrow&&<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                                            stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                                                                            style={{opacity:0.7}}><polyline points="9 18 15 12 9 6"/></svg>}</a></li>
-                                                );
-                                            })}
-                                        </ul>
-                                    </div>
-                                ))}
-
-                                {/* Admissions — ONLY visible when access_token exists in localStorage */}
-                                {isLoggedIn && (
-                                    <div style={{display:"flex",alignItems:"flex-start",gap:16}}>
-                                        <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",
-                                            fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,
-                                            minHeight:100,fontFamily:"Georgia,serif"}}>Admissions</div>
-                                        <ul style={{listStyle:"none",padding:0,margin:0,
-                                            display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
-                                            {menuData["Admissions"].map((item,i)=>{
-                                                const href = item === "Online Admission"
-                                                    ? "/admissions"
-                                                    : item === "Online Fee Payment"
-                                                        ? "/payment?from=fee"
-                                                        : "#";
-                                                return (
-                                                    <li key={i}>
-                                                        <a href={href} style={{color:"white",textDecoration:"none",fontSize:"13.5px",
-                                                            display:"flex",alignItems:"center",gap:6,opacity:0.9}}
-                                                           onMouseEnter={e=>(e.currentTarget.style.opacity="1")}
-                                                           onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}
-                                                        >{item}</a>
-                                                    </li>
-                                                );
-                                            })}
-                                        </ul>
-                                    </div>
-                                )}
-
-                            </div>
-                            <div style={{height:1,background:"rgba(255,255,255,0.08)",marginBottom:28}}/>
-                            <>
-                                <div style={{display:"flex",alignItems:"flex-start",gap:16}}>
-                                    <div style={{writingMode:"vertical-rl",transform:"rotate(180deg)",color:"#d4a820",fontSize:15,fontWeight:600,letterSpacing:"0.08em",lineHeight:1,minHeight:80,fontFamily:"Georgia,serif"}}>About Us</div>
-                                    <ul style={{listStyle:"none",padding:0,margin:0,display:"flex",flexDirection:"column",gap:10,paddingTop:4}}>
-                                        {(menuData["About Us"] as any[]).map((item: any, i: number)=>(
-                                            <li key={i}>
-                                                <a href="#" style={{color:"white",textDecoration:"none",fontSize:"13.5px",opacity:0.9}} onMouseEnter={e=>(e.currentTarget.style.opacity="1")} onMouseLeave={e=>(e.currentTarget.style.opacity="0.9")}>
-                                                    {typeof item==="string" ? item : item.label}
-                                                </a>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </>
-                        </div>
-                        {/*<div style={{borderTop:"1px solid rgba(255,255,255,0.1)",padding:"16px 40px"}}>*/}
-                        {/*    <div style={{display:"flex",justifyContent:"center",gap:36,marginBottom:12}}>*/}
-                        {/*        {BOTTOM_LINKS.map(link=><a key={link} href="#" style={{color:"#d4a820",fontSize:13,fontWeight:600,textDecoration:"none"}} onMouseEnter={e=>(e.currentTarget.style.opacity="0.75")} onMouseLeave={e=>(e.currentTarget.style.opacity="1")}>{link}</a>)}*/}
-                        {/*    </div>*/}
-                        {/*    <div style={{display:"flex",justifyContent:"space-between"}}>*/}
-                        {/*        <div style={{display:"flex",gap:24}}>{FOOTER_LEFT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>*/}
-                        {/*        <div style={{display:"flex",gap:24}}>{FOOTER_RIGHT.map(l=><a key={l} href="#" style={{color:"rgba(255,255,255,0.5)",fontSize:11,textDecoration:"none"}}>{l}</a>)}</div>*/}
-                        {/*    </div>*/}
-                        {/*</div>*/}
-                    </div>
-                    <div style={{flex:"0 0 6%",background:"linear-gradient(180deg,#8ab5cc,#3a6a80,#1a3a50)"}}/>
-                </div>
-            )}
         </>
     );
 }
