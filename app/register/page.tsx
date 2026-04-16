@@ -115,8 +115,8 @@ export default function RegisterPage() {
                 showToast(msg, "error");
                 return;
             }
-            showToast("Account created successfully! Please sign in.", "success");
-            setTimeout(() => { window.location.href = "/login"; }, 2000);
+            showToast("Account created successfully! Please Check Email For Verification...", "success");
+            // setTimeout(() => { window.location.href = "/login"; }, 2000);
         } catch {
             showToast("Unable to connect to server. Please try again.", "error");
         } finally {
