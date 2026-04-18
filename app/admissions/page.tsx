@@ -8,6 +8,21 @@ const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
 const SPECIAL_CHARS = new Set('@_!#$%^&*()<>?/\\|}{~:'.split(''));
 
+const CLASS_FEES: Record<string, string> = {
+    "1":  "500",
+    "2":  "500",
+    "3":  "750",
+    "4":  "750",
+    "5":  "1000",
+    "6":  "1000",
+    "7":  "1500",
+    "8":  "1500",
+    "9":  "2000",
+    "10": "2000",
+    "11": "2500",
+    "12": "2500",
+};
+
 /* ── Types ──────────────────────────────────────────────────────────── */
 interface FormData {
     full_name: string;
@@ -158,6 +173,7 @@ export default function AdmissionsPage() {
     const [errors,     setErrors]     = useState<FormErrors>({});
     const [submitting, setSubmitting] = useState(false);
     const [apiError,   setApiError]   = useState("");
+    const [submitted, setSubmitted] = useState(false);
 
     const certRef = useRef<HTMLInputElement>(null);
     const picRef  = useRef<HTMLInputElement>(null);
@@ -171,8 +187,16 @@ export default function AdmissionsPage() {
         if (field === "parents_phone_number") err = validatePhone(value);
         setErrors(prev => ({ ...prev, [field]: err }));
     }
+
     function set(field: keyof FormData, value: string) {
-        setForm(prev => ({ ...prev, [field]: value }));
+        setForm(prev => ({
+            ...prev,
+            [field]: value,
+            // Auto-fill fee when class changes
+            ...(field === "student_class" && value
+                ? { application_fee: CLASS_FEES[value] ?? "" }
+                : {}),
+        }));
         touch(field, value);
     }
 
@@ -193,14 +217,22 @@ export default function AdmissionsPage() {
                     fd.append(k, form[k] as string);
                 }
             });
-            const res = await fetch(`${BASE_URL}${API_VERSION}/student/create/`, { method: "POST", body: fd });
+            const res = await fetch(`${BASE_URL}${API_VERSION}/student/create/`, {
+                method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+                    },
+                body: fd,
+            });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data?.detail ?? `Error ${res.status}`);
             }
             // ── Redirect to payment page with student id from response ──
             const studentData = await res.json();
-            router.push(`/payment?student_id=${studentData.id}`);
+            localStorage.setItem("student_class", studentData.data.student_class);
+            setSubmitted(true);
+            setTimeout(() => router.push(`/payment?student_id=${studentData.data.id}`), 3000);
         } catch (err: any) {
             setApiError(err.message ?? "Something went wrong");
         } finally {
@@ -396,14 +428,12 @@ export default function AdmissionsPage() {
                                     />
                                 </Field>
 
-                                <Field label="Application Fee" error={errors.application_fee}>
+                                <Field label="Application Fee (NPR)" error={errors.application_fee}>
                                     <input
-                                        style={inputStyle(!!errors.application_fee)}
-                                        type="text" value={form.application_fee}
-                                        onChange={e => set("application_fee", e.target.value)}
-                                        placeholder="Amount"
-                                        onFocus={e => { e.currentTarget.style.borderColor = "var(--sky-500)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(22,144,216,0.18)"; }}
-                                        onBlur={e  => { e.currentTarget.style.borderColor = errors.application_fee ? "var(--danger)" : "rgba(255,255,255,0.1)"; e.currentTarget.style.boxShadow = "none"; }}
+                                        style={{ ...inputStyle(!!errors.application_fee), opacity: 0.75, cursor: "not-allowed" }}
+                                        type="text"
+                                        value={form.application_fee ? `NPR ${form.application_fee}` : "Select a class first"}
+                                        readOnly
                                     />
                                 </Field>
                             </div>

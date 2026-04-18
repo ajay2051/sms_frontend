@@ -164,12 +164,12 @@ export default function PaymentPage() {
                 const raw = localStorage.getItem("user");
                 if (raw) {
                     const userData = JSON.parse(raw);
-                    const classNum = parseClassNumber(userData?.class);
+                    const classNum = localStorage.getItem("student_class");
                     if (classNum) {
                         setStudent({
                             id: userData.user_id ?? 0,
                             full_name: userData.email ?? "Student",
-                            student_class: classNum,
+                            student_class: Number(classNum),
                             application_fee: "0",
                         });
                     } else {
@@ -186,9 +186,16 @@ export default function PaymentPage() {
         // Admissions payment: load student by ID from URL param
         const studentId = searchParams.get("student_id");
         if (!studentId) { setLoadingStudent(false); return; }
-        fetch(`${BASE_URL}${API_VERSION}/student/${studentId}/`)
+        fetch(`${BASE_URL}${API_VERSION}/student/retrieve/${studentId}/`, {
+            headers: {
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+            },
+        })
             .then(r => r.json())
-            .then((data: StudentData) => setStudent(data))
+            .then((res: any) => setStudent({
+                ...res.data,
+                student_class: parseInt(res.data.student_class),
+            }))
             .catch(() => setApiError("Failed to load student data."))
             .finally(() => setLoadingStudent(false));
     }, [searchParams]);
