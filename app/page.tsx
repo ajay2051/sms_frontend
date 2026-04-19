@@ -146,7 +146,7 @@ export default function HomePage() {
                                   onMouseLeave={e=>(e.currentTarget.style.borderBottomColor="transparent")}
                             >ONLINE ADMISSION</Link>
                             <span style={{color:"rgba(255,255,255,0.2)",fontSize:12}}>|</span>
-                            <Link href="/payment?from=fee" style={{color:"rgba(255,255,255,0.85)",fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",textDecoration:"none",padding:"6px 0",borderBottom:"1.5px solid transparent",transition:"all 0.2s"}}
+                            <Link href="/fee" style={{color:"rgba(255,255,255,0.85)",fontSize:10,fontWeight:700,letterSpacing:"0.16em",textTransform:"uppercase",textDecoration:"none",padding:"6px 0",borderBottom:"1.5px solid transparent",transition:"all 0.2s"}}
                                   onMouseEnter={e=>(e.currentTarget.style.borderBottomColor="#facc15")}
                                   onMouseLeave={e=>(e.currentTarget.style.borderBottomColor="transparent")}
                             >ONLINE FEE PAYMENT</Link>

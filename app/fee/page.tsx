@@ -75,7 +75,10 @@ export default function FeePage() {
             for (const month of selectedMonths) {
                 const res = await fetch(`${BASE_URL}${API_VERSION}/fee/create/`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+                        "Content-Type": "application/json",   // ✅ THIS LINE FIXES IT
+                    },
                     body: JSON.stringify({ month }),
                 });
                 if (!res.ok) {
@@ -85,6 +88,9 @@ export default function FeePage() {
             }
             setSuccessMonths([...selectedMonths]);
             setSuccess(true);
+            setTimeout(() => {
+                router.push("/payment?from=fee");
+            }, 1500);
         } catch (err: any) {
             setApiError(err.message ?? "Something went wrong");
         } finally {
