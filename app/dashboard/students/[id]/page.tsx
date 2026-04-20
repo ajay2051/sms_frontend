@@ -457,26 +457,26 @@ export default function StudentDetailPage() {
                     </span>
                 </div>
                 <div style={{ display:"flex", gap:10 }}>
-                    <button style={{
-                        padding:"8px 20px", borderRadius:9999,
-                        border:"1.5px solid rgba(255,255,255,0.15)",
-                        background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.75)",
-                        cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",
-                    }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.12)"; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.06)"; }}>
-                        Edit
-                    </button>
-                    <button style={{
-                        padding:"8px 20px", borderRadius:9999,
-                        border:"1.5px solid rgba(229,62,62,0.35)",
-                        background:"rgba(229,62,62,0.12)", color:"#fc8181",
-                        cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",
-                    }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.2)"; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.12)"; }}>
-                        Delete
-                    </button>
+                    {/*<button style={{*/}
+                    {/*    padding:"8px 20px", borderRadius:9999,*/}
+                    {/*    border:"1.5px solid rgba(255,255,255,0.15)",*/}
+                    {/*    background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.75)",*/}
+                    {/*    cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",*/}
+                    {/*}}*/}
+                    {/*        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.12)"; }}*/}
+                    {/*        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.06)"; }}>*/}
+                    {/*    Edit*/}
+                    {/*</button>*/}
+                    {/*<button style={{*/}
+                    {/*    padding:"8px 20px", borderRadius:9999,*/}
+                    {/*    border:"1.5px solid rgba(229,62,62,0.35)",*/}
+                    {/*    background:"rgba(229,62,62,0.12)", color:"#fc8181",*/}
+                    {/*    cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",*/}
+                    {/*}}*/}
+                    {/*        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.2)"; }}*/}
+                    {/*        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.12)"; }}>*/}
+                    {/*    Delete*/}
+                    {/*</button>*/}
                 </div>
             </header>
 
