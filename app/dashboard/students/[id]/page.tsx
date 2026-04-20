@@ -8,6 +8,9 @@ import type { Student } from "@/app/dashboard/page";
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
+const ADMISSION_STATUSES = ["Pending", "Approved", "Rejected"] as const;
+type AdmissionStatus = typeof ADMISSION_STATUSES[number];
+
 /* -- Helpers --------------------------------------------------------------- */
 function fmtDate(iso: string) {
     try {
@@ -90,7 +93,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
     );
 }
 
-/* -- Info row (dark) ------------------------------------------------------- */
+/* -- Info row -------------------------------------------------------------- */
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
@@ -157,6 +160,212 @@ function CertTile({ url, index }: { url: string; index: number }) {
     );
 }
 
+/* -- Admin Review Panel ---------------------------------------------------- */
+function AdminReviewPanel({ student, onSaved }: { student: Student; onSaved: (updated: Student) => void }) {
+    const [status,   setStatus]   = useState<AdmissionStatus>(
+        (capitalize(student.application_status) as AdmissionStatus) ?? "Pending"
+    );
+    const [comments, setComments] = useState(student.comments ?? "");
+    const [saving,   setSaving]   = useState(false);
+    const [toast,    setToast]    = useState<{ type: "success"|"error"; msg: string } | null>(null);
+
+    const isDirty =
+        status.toLowerCase()   !== student.application_status?.toLowerCase() ||
+        comments.trim()        !== (student.comments ?? "").trim();
+
+    async function handleSave() {
+        setSaving(true);
+        setToast(null);
+        try {
+            const token = localStorage.getItem("access_token");
+
+            const res = await fetch(`${BASE_URL}${API_VERSION}/student/update/${student.id}/`, {
+                method:  "PATCH",
+                headers: {
+                    Authorization:  `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    application_status: status.toLowerCase(),
+                    comments:           comments.trim() || null,
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json?.message ?? `Error ${res.status}`);
+            setToast({ type:"success", msg: "Review saved successfully." });
+            onSaved(json.data ?? json);
+        } catch (e: any) {
+            setToast({ type:"error", msg: e.message ?? "Something went wrong." });
+        } finally {
+            setSaving(false);
+            setTimeout(() => setToast(null), 4000);
+        }
+    }
+
+    const statusConfig: Record<AdmissionStatus, { bg: string; border: string; color: string; dot: string }> = {
+        Pending:  { bg:"rgba(212,160,23,0.08)",  border:"rgba(212,160,23,0.25)",  color:"#f6e05e", dot:"#f6e05e" },
+        Approved: { bg:"rgba(47,133,90,0.08)",   border:"rgba(47,133,90,0.25)",   color:"#68d391", dot:"#68d391" },
+        Rejected: { bg:"rgba(229,62,62,0.08)",   border:"rgba(229,62,62,0.25)",   color:"#fc8181", dot:"#fc8181" },
+    };
+    const sc = statusConfig[status];
+
+    return (
+        <GlassCard style={{ overflow:"hidden", marginTop: 24 }}>
+            {/* Header */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"16px 24px", borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <span style={{ color:"#e8b84b", display:"flex" }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </span>
+                    <h3 style={{ fontFamily:"Georgia,serif", color:"white", fontSize:"0.95rem", fontWeight:700, margin:0 }}>
+                        Admin Review
+                    </h3>
+                    <span style={{ background:"rgba(232,184,75,0.12)", color:"#e8b84b",
+                        padding:"2px 10px", borderRadius:9999,
+                        fontSize:"0.62rem", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}>
+                        Admin Only
+                    </span>
+                </div>
+                {/* Live status indicator */}
+                <div style={{ display:"flex", alignItems:"center", gap:7,
+                    background: sc.bg, border:`1px solid ${sc.border}`,
+                    borderRadius:9999, padding:"4px 12px" }}>
+                    <span style={{ width:7, height:7, borderRadius:"50%", background: sc.dot,
+                        boxShadow:`0 0 6px ${sc.dot}`, flexShrink:0, display:"inline-block" }}/>
+                    <span style={{ fontSize:"0.7rem", fontWeight:700, letterSpacing:"0.08em",
+                        textTransform:"uppercase", color: sc.color }}>
+                        {status}
+                    </span>
+                </div>
+            </div>
+
+            <div style={{ padding:"24px" }}>
+                {/* Status selector */}
+                <div style={{ marginBottom:20 }}>
+                    <label style={{ display:"block", marginBottom:10, fontSize:"0.68rem", fontWeight:600,
+                        letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(255,255,255,0.4)" }}>
+                        Application Status
+                    </label>
+                    <div style={{ display:"flex", gap:10 }}>
+                        {ADMISSION_STATUSES.map(s => {
+                            const cfg = statusConfig[s];
+                            const active = status === s;
+                            return (
+                                <button key={s} onClick={() => setStatus(s)} style={{
+                                    flex:1, padding:"10px 0", borderRadius:10, cursor:"pointer",
+                                    fontFamily:"inherit", fontSize:"0.8rem", fontWeight:700,
+                                    letterSpacing:"0.06em", textTransform:"uppercase",
+                                    transition:"all 0.15s",
+                                    background: active ? cfg.bg      : "rgba(255,255,255,0.03)",
+                                    border:     active ? `1.5px solid ${cfg.border}` : "1.5px solid rgba(255,255,255,0.08)",
+                                    color:      active ? cfg.color   : "rgba(255,255,255,0.35)",
+                                }}>
+                                    {s}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Comments textarea */}
+                <div style={{ marginBottom:20 }}>
+                    <label style={{ display:"block", marginBottom:10, fontSize:"0.68rem", fontWeight:600,
+                        letterSpacing:"0.1em", textTransform:"uppercase", color:"rgba(255,255,255,0.4)" }}>
+                        Comments
+                        <span style={{ marginLeft:8, color:"rgba(255,255,255,0.2)", fontSize:"0.62rem",
+                            fontWeight:400, letterSpacing:"0.04em", textTransform:"none" }}>
+                            — visible to admin only, sent to student on review
+                        </span>
+                    </label>
+                    <textarea
+                        value={comments}
+                        onChange={e => setComments(e.target.value)}
+                        placeholder="Add review notes, flag missing documents, request corrections…"
+                        rows={4}
+                        style={{
+                            width:"100%", boxSizing:"border-box",
+                            background:"rgba(255,255,255,0.04)",
+                            border:"1px solid rgba(255,255,255,0.1)",
+                            borderRadius:10, padding:"12px 16px",
+                            color:"rgba(255,255,255,0.85)", fontFamily:"inherit",
+                            fontSize:"0.875rem", lineHeight:1.6, resize:"vertical",
+                            outline:"none", transition:"border-color 0.15s",
+                        }}
+                        onFocus={e  => { e.currentTarget.style.borderColor = "rgba(22,144,216,0.5)"; }}
+                        onBlur={e   => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                    />
+                    <p style={{ margin:"6px 0 0", fontSize:"0.7rem", color:"rgba(255,255,255,0.25)",
+                        textAlign:"right" }}>
+                        {comments.length} character{comments.length !== 1 ? "s" : ""}
+                    </p>
+                </div>
+
+                {/* Toast */}
+                {toast && (
+                    <div style={{
+                        marginBottom:16, padding:"10px 16px", borderRadius:9,
+                        display:"flex", alignItems:"center", gap:9, fontSize:"0.8rem", fontWeight:500,
+                        background: toast.type === "success" ? "rgba(47,133,90,0.15)"  : "rgba(229,62,62,0.15)",
+                        border:     toast.type === "success" ? "1px solid rgba(47,133,90,0.35)" : "1px solid rgba(229,62,62,0.35)",
+                        color:      toast.type === "success" ? "#68d391" : "#fc8181",
+                    }}>
+                        {toast.type === "success"
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        }
+                        {toast.msg}
+                    </div>
+                )}
+
+                {/* Action row */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+                    <p style={{ fontSize:"0.72rem", color:"rgba(255,255,255,0.25)", margin:0 }}>
+                        {isDirty ? "You have unsaved changes." : "No unsaved changes."}
+                    </p>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || !isDirty}
+                        style={{
+                            display:"flex", alignItems:"center", gap:8,
+                            padding:"10px 28px", borderRadius:9999, cursor: saving || !isDirty ? "not-allowed" : "pointer",
+                            fontFamily:"inherit", fontSize:"0.82rem", fontWeight:700,
+                            letterSpacing:"0.06em", textTransform:"uppercase",
+                            transition:"all 0.15s",
+                            background: saving || !isDirty ? "rgba(255,255,255,0.05)" : "rgba(22,144,216,0.85)",
+                            border:     saving || !isDirty ? "1.5px solid rgba(255,255,255,0.1)" : "1.5px solid rgba(22,144,216,0.6)",
+                            color:      saving || !isDirty ? "rgba(255,255,255,0.3)" : "white",
+                            opacity:    saving ? 0.7 : 1,
+                        }}
+                    >
+                        {saving ? (
+                            <>
+                                <svg style={{ animation:"spin 1s linear infinite" }} width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                </svg>
+                                Saving…
+                            </>
+                        ) : (
+                            <>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                Save Review
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </GlassCard>
+    );
+}
+
 /* -- Main page ------------------------------------------------------------- */
 export default function StudentDetailPage() {
     useAuthGuard();
@@ -179,6 +388,8 @@ export default function StudentDetailPage() {
             .catch(e => setError(e.message))
             .finally(() => setLoading(false));
     }, [id]);
+
+    if (loading) return <LoadingScreen message="Loading student…"/>;
 
     /* -- Error state ------------------------------------------------------- */
     if (error || !student) return (
@@ -212,8 +423,6 @@ export default function StudentDetailPage() {
             background: "linear-gradient(135deg, #06152e 0%, #0c2044 55%, #10295a 100%)",
             fontFamily: "system-ui, -apple-system, sans-serif",
         }}>
-
-            {/* Subtle radial glows matching login page */}
             <div style={{ position:"fixed", inset:0, pointerEvents:"none", zIndex:0,
                 backgroundImage:`
                     radial-gradient(ellipse 60% 50% at 10% 20%, rgba(22,144,216,0.08) 0%, transparent 60%),
@@ -222,15 +431,13 @@ export default function StudentDetailPage() {
 
             {/* -- Top bar ------------------------------------------------- */}
             <header style={{
-                position: "sticky", top: 0, zIndex: 50,
-                background: "rgba(6,21,46,0.85)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                borderBottom: "1px solid rgba(255,255,255,0.07)",
-                padding: "0 32px", height: 64,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
+                position:"sticky", top:0, zIndex:50,
+                background:"rgba(6,21,46,0.85)",
+                backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
+                borderBottom:"1px solid rgba(255,255,255,0.07)",
+                padding:"0 32px", height:64,
+                display:"flex", alignItems:"center", justifyContent:"space-between",
             }}>
-                {/* Breadcrumb */}
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <button onClick={() => router.push("/dashboard")}
                             style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none",
@@ -249,8 +456,6 @@ export default function StudentDetailPage() {
                         #{student.id}
                     </span>
                 </div>
-
-                {/* Actions */}
                 <div style={{ display:"flex", gap:10 }}>
                     <button style={{
                         padding:"8px 20px", borderRadius:9999,
@@ -278,18 +483,16 @@ export default function StudentDetailPage() {
             {/* -- Content ------------------------------------------------- */}
             <div style={{ position:"relative", zIndex:1, maxWidth:960, margin:"0 auto", padding:"32px 24px 64px" }}>
 
-                {/* -- Hero profile card ------------------------------------ */}
+                {/* -- Hero card ------------------------------------------- */}
                 <GlassCard style={{ marginBottom:24, overflow:"hidden" }}>
-                    {/* Banner */}
                     <div style={{
-                        height: 100,
-                        background: "linear-gradient(135deg, #0e4a7a 0%, #163470 50%, #1b3f86 100%)",
-                        position: "relative", overflow: "hidden",
+                        height:100,
+                        background:"linear-gradient(135deg, #0e4a7a 0%, #163470 50%, #1b3f86 100%)",
+                        position:"relative", overflow:"hidden",
                     }}>
                         <div style={{ position:"absolute", inset:0,
                             backgroundImage:`radial-gradient(circle at 20% 60%, rgba(22,144,216,0.3) 0%, transparent 50%),
                                              radial-gradient(circle at 75% 30%, rgba(232,184,75,0.15) 0%, transparent 45%)` }}/>
-                        {/* Decorative school icon top-right */}
                         <div style={{ position:"absolute", right:24, top:"50%", transform:"translateY(-50%)",
                             width:40, height:40, borderRadius:"50%",
                             background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.15)",
@@ -302,9 +505,7 @@ export default function StudentDetailPage() {
                         </div>
                     </div>
 
-                    {/* Profile row */}
                     <div style={{ padding:"0 28px 28px", position:"relative" }}>
-                        {/* Avatar */}
                         <div style={{ position:"relative", display:"inline-block", marginTop:-44 }}>
                             {student.profile_pic ? (
                                 <img src={student.profile_pic} alt={student.full_name}
@@ -323,7 +524,6 @@ export default function StudentDetailPage() {
                                     {initials(student.full_name)}
                                 </div>
                             )}
-                            {/* Status dot */}
                             <div style={{
                                 position:"absolute", bottom:4, right:4,
                                 width:16, height:16, borderRadius:"50%",
@@ -357,8 +557,6 @@ export default function StudentDetailPage() {
                                     }}>Year {student.year}</span>
                                 </div>
                             </div>
-
-                            {/* Fee box */}
                             <div style={{
                                 background:"rgba(22,144,216,0.12)",
                                 border:"1px solid rgba(22,144,216,0.25)",
@@ -381,13 +579,10 @@ export default function StudentDetailPage() {
                 </GlassCard>
 
                 {/* -- Two-column grid -------------------------------------- */}
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}
-                     className="max-sm:grid-cols-1">
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
 
-                    {/* -- LEFT column -- */}
+                    {/* LEFT column */}
                     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-
-                        {/* Student info */}
                         <GlassCard style={{ overflow:"hidden" }}>
                             <SectionHeader title="Student Information"
                                            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
@@ -401,7 +596,6 @@ export default function StudentDetailPage() {
                             <Row label="Comments"   value={student.comments || "-"}/>
                         </GlassCard>
 
-                        {/* Timeline */}
                         <GlassCard style={{ overflow:"hidden" }}>
                             <SectionHeader title="Timeline"
                                            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
@@ -412,34 +606,24 @@ export default function StudentDetailPage() {
                                     <div style={{ width:8, height:8, borderRadius:"50%", background:"#1690d8",
                                         flexShrink:0, marginTop:5, boxShadow:"0 0 8px rgba(22,144,216,0.6)" }}/>
                                     <div>
-                                        <p style={{ fontSize:"0.85rem", fontWeight:600, color:"white", margin:0 }}>
-                                            Application Created
-                                        </p>
-                                        <p style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", marginTop:3 }}>
-                                            {fmtDate(student.created_at)}
-                                        </p>
+                                        <p style={{ fontSize:"0.85rem", fontWeight:600, color:"white", margin:0 }}>Application Created</p>
+                                        <p style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", marginTop:3 }}>{fmtDate(student.created_at)}</p>
                                     </div>
                                 </div>
                                 <div style={{ display:"flex", gap:14, padding:"16px 0", alignItems:"flex-start" }}>
                                     <div style={{ width:8, height:8, borderRadius:"50%", background:"#e8b84b",
                                         flexShrink:0, marginTop:5, boxShadow:"0 0 8px rgba(232,184,75,0.5)" }}/>
                                     <div>
-                                        <p style={{ fontSize:"0.85rem", fontWeight:600, color:"white", margin:0 }}>
-                                            Last Updated
-                                        </p>
-                                        <p style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", marginTop:3 }}>
-                                            {fmtDate(student.updated_at)}
-                                        </p>
+                                        <p style={{ fontSize:"0.85rem", fontWeight:600, color:"white", margin:0 }}>Last Updated</p>
+                                        <p style={{ fontSize:"0.75rem", color:"rgba(255,255,255,0.4)", marginTop:3 }}>{fmtDate(student.updated_at)}</p>
                                     </div>
                                 </div>
                             </div>
                         </GlassCard>
                     </div>
 
-                    {/* -- RIGHT column -- */}
+                    {/* RIGHT column */}
                     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-
-                        {/* Parent info */}
                         <GlassCard style={{ overflow:"hidden" }}>
                             <SectionHeader title="Parent / Guardian"
                                            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
@@ -449,7 +633,6 @@ export default function StudentDetailPage() {
                             <Row label="Phone"    value={student.parents_phone_number}/>
                         </GlassCard>
 
-                        {/* Profile photo */}
                         {student.profile_pic && (
                             <GlassCard style={{ overflow:"hidden" }}>
                                 <SectionHeader title="Profile Photo"
@@ -463,7 +646,6 @@ export default function StudentDetailPage() {
                             </GlassCard>
                         )}
 
-                        {/* Certificates */}
                         <GlassCard style={{ overflow:"hidden" }}>
                             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
                                 padding:"16px 24px", borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
@@ -474,9 +656,7 @@ export default function StudentDetailPage() {
                                             <polyline points="14 2 14 8 20 8"/>
                                         </svg>
                                     </span>
-                                    <h3 style={{ fontFamily:"Georgia,serif", color:"white", fontSize:"0.95rem", fontWeight:700, margin:0 }}>
-                                        Certificates
-                                    </h3>
+                                    <h3 style={{ fontFamily:"Georgia,serif", color:"white", fontSize:"0.95rem", fontWeight:700, margin:0 }}>Certificates</h3>
                                 </div>
                                 <span style={{
                                     background:"rgba(255,255,255,0.08)", color:"rgba(255,255,255,0.55)",
@@ -499,6 +679,12 @@ export default function StudentDetailPage() {
                         </GlassCard>
                     </div>
                 </div>
+
+                {/* -- Admin Review Panel (full-width below grid) ----------- */}
+                <AdminReviewPanel
+                    student={student}
+                    onSaved={updated => setStudent(prev => prev ? { ...prev, ...updated } : updated)}
+                />
             </div>
         </div>
     );

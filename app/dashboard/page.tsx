@@ -756,8 +756,8 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                                 <td style={{fontWeight:700,color:theme.accentGold}}>NPR {Number(s.application_fee).toLocaleString()}</td>
                                 <td>
                                     <div style={{display:"flex",gap:6,flexWrap:"nowrap"}}>
-                                        <button className="btn-detail" onClick={()=>router.push(`/dashboard/students/${s.id}`)}>Detail</button>
-                                        <button className="btn-edit">Edit</button>
+                                        <button className="btn-detail" onClick={()=>router.push(`/dashboard/students/${s.id}`)}>Approve</button>
+                                        {/*<button className="btn-edit">Edit</button>*/}
                                         <button className="btn-delete">Delete</button>
                                     </div>
                                 </td>
