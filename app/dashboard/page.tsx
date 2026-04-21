@@ -38,6 +38,21 @@ interface StudentListResponse {
     results: Student[];
 }
 
+interface Notice {
+    id: number;
+    title: string;
+    description: string;
+    created_at: string;
+    updated_at: string;
+}
+
+interface NoticeListResponse {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Notice[];
+}
+
 const TAB_ICONS: Record<Tab, JSX.Element> = {
     Students: (
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -61,11 +76,6 @@ const MOCK_PAYMENTS = [
     { id:1, txn_id:"TXN202401001", total_amount:"15000", payment_method:"eSewa",         status:"Completed", student:1, created_at:"2024-01-15", updated_at:"2024-01-15" },
     { id:2, txn_id:"TXN202401002", total_amount:"15000", payment_method:"Khalti",        status:"Pending",   student:2, created_at:"2024-02-10", updated_at:"2024-02-10" },
     { id:3, txn_id:"TXN202401003", total_amount:"15000", payment_method:"Bank Transfer", status:"Failed",    student:3, created_at:"2024-01-30", updated_at:"2024-02-01" },
-];
-const MOCK_NOTICES = [
-    { id:1, title:"Term Dates 2024-25",       description:"The academic year begins 1 September 2024 and ends 20 June 2025.",    created_at:"2024-01-05", updated_at:"2024-01-05" },
-    { id:2, title:"Fee Payment Deadline",     description:"All application fees must be settled before 15 April 2024.",           created_at:"2024-02-12", updated_at:"2024-02-20" },
-    { id:3, title:"Winter Sports Programme",  description:"Registration for the Winter Sports Programme is now open.",             created_at:"2024-03-01", updated_at:"2024-03-01" },
 ];
 
 /* -- Helpers --------------------------------------------------------------- */
@@ -482,11 +492,14 @@ function PaymentsTab() {
 }
 
 /* -- Notice form ----------------------------------------------------------- */
-function NoticeForm({ onBack, onSave }: { onBack:()=>void; onSave:(n:{title:string;description:string})=>void }) {
-    const [title,  setTitle]  = useState("");
-    const [desc,   setDesc]   = useState("");
-    const [errors, setErrors] = useState<{title?:string; description?:string}>({});
-    const special = new Set('@_!#$%^&*()<>?/\\|}{~:');
+function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void }) {
+    const [title,      setTitle]      = useState("");
+    const [desc,       setDesc]       = useState("");
+    const [errors,     setErrors]     = useState<{ title?: string; description?: string }>({});
+    const [submitting, setSubmitting] = useState(false);
+    const [apiError,   setApiError]   = useState("");
+
+    const special = new Set("@_!#$%^&*()<>?/\\|}{~:");
 
     function validate() {
         const e: typeof errors = {};
@@ -495,47 +508,147 @@ function NoticeForm({ onBack, onSave }: { onBack:()=>void; onSave:(n:{title:stri
         if (!desc.trim()) e.description = "Description is required.";
         return e;
     }
-    function handleSubmit() {
+
+    async function handleSubmit() {
         const e = validate();
         if (Object.keys(e).length) { setErrors(e); return; }
-        onSave({ title, description: desc });
+
+        setSubmitting(true);
+        setApiError("");
+
+        try {
+            const token = localStorage.getItem("access_token");
+            const res = await fetch(`${BASE_URL}${API_VERSION}/notice/create/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ title: title.trim(), description: desc.trim() }),
+            });
+
+            if (res.status === 401) {
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+                return;
+            }
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                // Surface backend validation errors (e.g. special char on title)
+                if (data?.title)       setErrors(v => ({ ...v, title: data.title[0] }));
+                if (data?.description) setErrors(v => ({ ...v, description: data.description[0] }));
+                if (!data?.title && !data?.description)
+                    setApiError(data?.message ?? `Request failed (${res.status})`);
+                return;
+            }
+
+            onSave(); // success → parent refreshes list and switches view
+        } catch {
+            setApiError("Network error. Please try again.");
+        } finally {
+            setSubmitting(false);
+        }
     }
 
     return (
         <div className="fade-up">
             {/* Back breadcrumb */}
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:24 }}>
-                <button onClick={onBack} className="btn-ghost" style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px" }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+                <button onClick={onBack} className="btn-ghost"
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
                     Notice
                 </button>
-                <span style={{ color: theme.textMuted }}>·</span>
-                <span style={{ fontSize:"0.8rem", color: theme.textMuted }}>Create Notice</span>
+                <span style={{ color: theme.textMuted }}>›</span>
+                <span style={{ fontSize: "0.8rem", color: theme.textMuted }}>Create Notice</span>
             </div>
 
             <div className="dark-card" style={{ maxWidth: 560 }}>
                 {/* Card header */}
-                <div style={{ padding:"22px 28px", borderBottom:`1px solid ${theme.border}` }}>
-                    <h2 style={{ color: theme.textPrimary, fontSize:"1.05rem", fontWeight:700, margin:0 }}>Create Notice</h2>
-                    <p style={{ color: theme.textMuted, fontSize:"0.78rem", marginTop:4 }}>Broadcast a notice to all students</p>
+                <div style={{ padding: "22px 28px", borderBottom: `1px solid ${theme.border}` }}>
+                    <h2 style={{ color: theme.textPrimary, fontSize: "1.05rem", fontWeight: 700, margin: 0 }}>
+                        Create Notice
+                    </h2>
+                    <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
+                        Broadcast a notice to all students
+                    </p>
                 </div>
-                <div style={{ padding:28 }}>
-                    <div style={{ marginBottom:18 }}>
-                        <label style={{ display:"block", marginBottom:7, fontSize:"0.68rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:theme.textMuted }}>Title</label>
-                        <input className="dark-input" style={errors.title?{borderColor:theme.danger}:{}} value={title}
-                               onChange={e=>{setTitle(e.target.value);setErrors(v=>({...v,title:undefined}));}} placeholder="e.g. Term Dates 2024-25"/>
-                        {errors.title && <p style={{color:theme.danger,fontSize:"0.72rem",marginTop:5}}>{errors.title}</p>}
+
+                <div style={{ padding: 28 }}>
+                    {/* API-level error */}
+                    {apiError && (
+                        <div className="error-banner" style={{ marginBottom: 18 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 strokeWidth="2" strokeLinecap="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="12" y1="8" x2="12" y2="12"/>
+                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                            {apiError}
+                        </div>
+                    )}
+
+                    {/* Title */}
+                    <div style={{ marginBottom: 18 }}>
+                        <label style={{ display: "block", marginBottom: 7, fontSize: "0.68rem", fontWeight: 600,
+                            letterSpacing: "0.08em", textTransform: "uppercase", color: theme.textMuted }}>
+                            Title
+                        </label>
+                        <input
+                            className="dark-input"
+                            style={errors.title ? { borderColor: theme.danger } : {}}
+                            value={title}
+                            onChange={e => { setTitle(e.target.value); setErrors(v => ({ ...v, title: undefined })); }}
+                            placeholder="e.g. Term Dates 2024-25"
+                        />
+                        {errors.title && (
+                            <p style={{ color: theme.danger, fontSize: "0.72rem", marginTop: 5 }}>{errors.title}</p>
+                        )}
                     </div>
-                    <div style={{ marginBottom:18 }}>
-                        <label style={{ display:"block", marginBottom:7, fontSize:"0.68rem", fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:theme.textMuted }}>Description</label>
-                        <textarea className="dark-input" style={errors.description?{borderColor:theme.danger,minHeight:120}:{minHeight:120}}
-                                  value={desc} onChange={e=>{setDesc(e.target.value);setErrors(v=>({...v,description:undefined}));}}
-                                  placeholder="Write the notice content here..." rows={5}/>
-                        {errors.description && <p style={{color:theme.danger,fontSize:"0.72rem",marginTop:5}}>{errors.description}</p>}
+
+                    {/* Description */}
+                    <div style={{ marginBottom: 18 }}>
+                        <label style={{ display: "block", marginBottom: 7, fontSize: "0.68rem", fontWeight: 600,
+                            letterSpacing: "0.08em", textTransform: "uppercase", color: theme.textMuted }}>
+                            Description
+                        </label>
+                        <textarea
+                            className="dark-input"
+                            style={errors.description ? { borderColor: theme.danger, minHeight: 120 } : { minHeight: 120 }}
+                            value={desc}
+                            onChange={e => { setDesc(e.target.value); setErrors(v => ({ ...v, description: undefined })); }}
+                            placeholder="Write the notice content here..."
+                            rows={5}
+                        />
+                        {errors.description && (
+                            <p style={{ color: theme.danger, fontSize: "0.72rem", marginTop: 5 }}>{errors.description}</p>
+                        )}
                     </div>
-                    <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:6 }}>
-                        <button className="btn-ghost" onClick={onBack}>Cancel</button>
-                        <button className="btn-primary" onClick={handleSubmit}>Save Notice</button>
+
+                    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
+                        <button className="btn-ghost" onClick={onBack} disabled={submitting}>Cancel</button>
+                        <button
+                            className="btn-primary"
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            style={{ display: "flex", alignItems: "center", gap: 7, opacity: submitting ? 0.65 : 1 }}
+                        >
+                            {submitting ? (
+                                <>
+                                    <svg style={{ animation: "spin 0.8s linear infinite" }} width="13" height="13"
+                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                                         strokeLinecap="round">
+                                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                    </svg>
+                                    Saving…
+                                </>
+                            ) : "Save Notice"}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -544,46 +657,139 @@ function NoticeForm({ onBack, onSave }: { onBack:()=>void; onSave:(n:{title:stri
 }
 
 /* -- Notice tab ------------------------------------------------------------ */
-function NoticeTab() {
-    const [view,    setView]    = useState<"list"|"create">("list");
-    const [notices, setNotices] = useState(MOCK_NOTICES);
+function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
+    const [view,    setView]    = useState<"list" | "create">("list");
+    const [notices, setNotices] = useState<Notice[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error,   setError]   = useState("");
+    const [page,    setPage]    = useState(1);
+    const [total,   setTotal]   = useState(0);
+    const PAGE_SIZE = 10;
 
-    function handleSave(n: {title:string; description:string}) {
-        const now = new Date().toISOString().split("T")[0];
-        setNotices(prev => [...prev, { id:prev.length+1, ...n, created_at:now, updated_at:now }]);
-        setView("list");
+    async function fetchNotices(p = 1) {
+        setLoading(true);
+        setError("");
+        try {
+            const token = localStorage.getItem("access_token");
+            const params = new URLSearchParams({ page: String(p), page_size: String(PAGE_SIZE) });
+            const res = await fetch(`${BASE_URL}${API_VERSION}/notice/list/?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (res.status === 401) {
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+                return;
+            }
+
+            if (!res.ok) throw new Error(`Error ${res.status}`);
+            const data: NoticeListResponse = await res.json();
+            setNotices(data.results);
+            setTotal(data.count);
+            onCount(data.count);
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Failed to load notices.");
+        } finally {
+            setLoading(false);
+        }
     }
 
-    if (view === "create") return <NoticeForm onBack={()=>setView("list")} onSave={handleSave}/>;
+    useEffect(() => { fetchNotices(page); }, [page]);
+
+    // Called by NoticeForm on successful save
+    function handleSaved() {
+        setView("list");
+        setPage(1);
+        fetchNotices(1); // refresh immediately
+    }
+
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+
+    if (view === "create") return <NoticeForm onBack={() => setView("list")} onSave={handleSaved} />;
 
     return (
         <div className="fade-up">
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                 <div>
-                    <h2 style={{color:theme.textPrimary,fontSize:"1.35rem",fontWeight:700,margin:0}}>Notice Board</h2>
-                    <p style={{color:theme.textMuted,fontSize:"0.78rem",marginTop:4}}>{notices.length} notices published</p>
+                    <h2 style={{ color: theme.textPrimary, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
+                        Notice Board
+                    </h2>
+                    <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
+                        {loading ? "Loading…" : `${total} notice${total !== 1 ? "s" : ""} published`}
+                    </p>
                 </div>
-                <button className="btn-primary" style={{ display:"flex", alignItems:"center", gap:7 }} onClick={()=>setView("create")}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <button
+                    className="btn-primary"
+                    style={{ display: "flex", alignItems: "center", gap: 7 }}
+                    onClick={() => setView("create")}
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
                     Create Notice
                 </button>
             </div>
+
+            {error && (
+                <div className="error-banner">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {error}
+                </div>
+            )}
+
             <TableWrap>
-                <thead><tr>{["#","Title","Description","Created","Updated"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead>
+                <tr>{["#", "Title", "Description", "Created", "Updated"].map(h => <th key={h}>{h}</th>)}</tr>
+                </thead>
                 <tbody>
-                {notices.map(n => (
-                    <tr key={n.id}>
-                        <td style={{color:theme.textMuted,fontSize:"0.78rem"}}>{n.id}</td>
-                        <td style={{fontWeight:600,color:theme.textPrimary}}>{n.title}</td>
-                        <td style={{maxWidth:320,color:theme.textSecondary}}>
-                            <span style={{display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.description}</span>
-                        </td>
-                        <td style={{color:theme.textMuted}}>{n.created_at}</td>
-                        <td style={{color:theme.textMuted}}>{n.updated_at}</td>
-                    </tr>
-                ))}
+                {loading
+                    ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={5} />)
+                    : !notices.length
+                        ? <tr><td colSpan={5} style={{ textAlign: "center", padding: "48px 16px", color: theme.textMuted }}>
+                            No notices found.
+                        </td></tr>
+                        : notices.map(n => (
+                            <tr key={n.id}>
+                                <td style={{ color: theme.textMuted, fontSize: "0.78rem" }}>{n.id}</td>
+                                <td style={{ fontWeight: 600, color: theme.textPrimary }}>{n.title}</td>
+                                <td style={{ maxWidth: 320, color: theme.textSecondary }}>
+                                        <span style={{ display: "-webkit-box", WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                            {n.description}
+                                        </span>
+                                </td>
+                                <td style={{ color: theme.textMuted }}>{fmtDate(n.created_at)}</td>
+                                <td style={{ color: theme.textMuted }}>{fmtDate(n.updated_at)}</td>
+                            </tr>
+                        ))
+                }
                 </tbody>
             </TableWrap>
+
+            {/* Pagination */}
+            {!loading && totalPages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                    <p style={{ fontSize: "0.78rem", color: theme.textMuted }}>
+                        Page {page} of {totalPages} · {total} total
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn-ghost" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                            ← Prev
+                        </button>
+                        <button className="btn-ghost" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
+                            Next →
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -786,6 +992,7 @@ export default function DashboardPage() {
     const [activeTab,    setActiveTab]    = useState<Tab>("Students");
     const [sidebarOpen,  setSidebarOpen]  = useState(true);
     const [studentCount, setStudentCount] = useState<number>(0);
+    const [noticeCount, setNoticeCount] = useState<number>(0);
 
     function handleSignOut() {
         localStorage.removeItem("access_token");
@@ -834,7 +1041,7 @@ export default function DashboardPage() {
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>}
                         />
                         <StatCard
-                            label="Total Notices" value={MOCK_NOTICES.length} variant="stat-card-gold"
+                            label="Total Notices" value={noticeCount || "—"} variant="stat-card-gold"
                             iconColor={theme.accentGold}
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
                         />
@@ -842,7 +1049,7 @@ export default function DashboardPage() {
 
                     {activeTab === "Students" && <StudentsTabWithCount onCount={setStudentCount}/>}
                     {activeTab === "Payments" && <PaymentsTab/>}
-                    {activeTab === "Notice"   && <NoticeTab/>}
+                    {activeTab === "Notice" && <NoticeTabWithCount onCount={setNoticeCount} />}
                 </main>
             </div>
         </>
