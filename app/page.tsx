@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {apiFetch} from "@/lib/apiFetch";
 
 const LOGO_SRC    = "/logo.png";
 const HERO_BG_SRC = "/school_bg.jpg";
@@ -173,14 +174,17 @@ export default function HomePage() {
     const [profile,     setProfile]     = useState<ProfileData | null>(null);
 
     /* Fetch profile once on mount if logged in */
+    // In HomePage — replace the fetch block inside useEffect
     useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) return;
         setIsLoggedIn(true);
 
-        fetch(`${BASE_URL}${API_VERSION}/student/profile/`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(
+            "/student/profile/",
+            {},
+            () => { setIsLoggedIn(false); setProfile(null); }   // called before redirect
+        )
             .then(r => r.ok ? r.json() : Promise.reject())
             .then(json => {
                 const d = json?.data;
