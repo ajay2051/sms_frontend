@@ -53,6 +53,25 @@ interface NoticeListResponse {
     results: Notice[];
 }
 
+interface Payment {
+    id: number;
+    txn_id: string;
+    total_amount: string;
+    payment_method: string;
+    status: string;
+    student: string;
+    monthly_fee: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+interface PaymentListResponse {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Payment[];
+}
+
 const TAB_ICONS: Record<Tab, JSX.Element> = {
     Students: (
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -71,12 +90,6 @@ const TAB_ICONS: Record<Tab, JSX.Element> = {
         </svg>
     ),
 };
-
-const MOCK_PAYMENTS = [
-    { id:1, txn_id:"TXN202401001", total_amount:"15000", payment_method:"eSewa",         status:"Completed", student:1, created_at:"2024-01-15", updated_at:"2024-01-15" },
-    { id:2, txn_id:"TXN202401002", total_amount:"15000", payment_method:"Khalti",        status:"Pending",   student:2, created_at:"2024-02-10", updated_at:"2024-02-10" },
-    { id:3, txn_id:"TXN202401003", total_amount:"15000", payment_method:"Bank Transfer", status:"Failed",    student:3, created_at:"2024-01-30", updated_at:"2024-02-01" },
-];
 
 /* -- Helpers --------------------------------------------------------------- */
 function fmtDate(iso: string) {
@@ -463,30 +476,112 @@ function SkeletonRow({ cols }: { cols: number }) {
 }
 
 /* -- Payments tab ---------------------------------------------------------- */
-function PaymentsTab() {
+function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
+    const [data,    setData]    = useState<PaymentListResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error,   setError]   = useState("");
+    const [page,    setPage]    = useState(1);
+    const PAGE_SIZE = 10;
+
+    useEffect(() => {
+        setLoading(true);
+        setError("");
+        const token = localStorage.getItem("access_token");
+        const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        fetch(`${BASE_URL}${API_VERSION}/payment/all-payments/?${params}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => {
+                if (r.status === 401) {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("refresh_token");
+                    localStorage.removeItem("user");
+                    window.location.href = "/login";
+                    throw new Error("Unauthorized");
+                }
+                if (!r.ok) throw new Error(`Error ${r.status}`);
+                return r.json();
+            })
+            .then((d: PaymentListResponse) => { setData(d); onCount(d.count); })
+            .catch(e => setError(e.message))
+            .finally(() => setLoading(false));
+    }, [page]);
+
+    const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
+
     return (
         <div className="fade-up">
             <div style={{ marginBottom: 24 }}>
-                <h2 style={{ color: theme.textPrimary, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>Payments</h2>
-                <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>{MOCK_PAYMENTS.length} transactions</p>
+                <h2 style={{ color: theme.textPrimary, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
+                    Payments
+                </h2>
+                <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
+                    {loading ? "Loading…" : `${data?.count ?? 0} transaction${data?.count !== 1 ? "s" : ""}`}
+                </p>
             </div>
+
+            {error && (
+                <div className="error-banner">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {error}
+                </div>
+            )}
+
             <TableWrap>
-                <thead><tr>{["#","Transaction ID","Student","Method","Amount","Status","Created","Updated"].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                <thead>
+                <tr>
+                    {["#", "Transaction ID", "Student", "Method", "Amount", "Monthly Fee", "Status", "Created", "Updated"]
+                        .map(h => <th key={h}>{h}</th>)}
+                </tr>
+                </thead>
                 <tbody>
-                {MOCK_PAYMENTS.map(p => (
-                    <tr key={p.id}>
-                        <td style={{ color: theme.textMuted, fontSize: "0.78rem" }}>{p.id}</td>
-                        <td><span className="mono" style={{ color: theme.accentBlue }}>{p.txn_id}</span></td>
-                        <td style={{ color: theme.textMuted }}>#{p.student}</td>
-                        <td style={{ color: theme.textPrimary }}>{p.payment_method}</td>
-                        <td style={{ fontWeight: 700, color: theme.textPrimary }}>NPR {Number(p.total_amount).toLocaleString()}</td>
-                        <td><StatusBadge status={p.status}/></td>
-                        <td style={{ color: theme.textMuted }}>{p.created_at}</td>
-                        <td style={{ color: theme.textMuted }}>{p.updated_at}</td>
-                    </tr>
-                ))}
+                {loading
+                    ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
+                    : !data?.results.length
+                        ? <tr><td colSpan={9} style={{ textAlign: "center", padding: "48px 16px", color: theme.textMuted }}>
+                            No payments found.
+                        </td></tr>
+                        : data.results.map(p => (
+                            <tr key={p.id}>
+                                <td style={{ color: theme.textMuted, fontSize: "0.78rem" }}>{p.id}</td>
+                                <td><span className="mono" style={{ color: theme.accentBlue }}>{p.txn_id}</span></td>
+                                <td style={{ fontWeight: 600, color: theme.textPrimary }}>{p.student}</td>
+                                <td style={{ color: theme.textPrimary }}>{p.payment_method}</td>
+                                <td style={{ fontWeight: 700, color: theme.textPrimary }}>
+                                    NPR {Number(p.total_amount).toLocaleString()}
+                                </td>
+                                <td style={{ color: theme.textSecondary }}>
+                                    {p.monthly_fee ? `NPR ${Number(p.monthly_fee).toLocaleString()}` : "—"}
+                                </td>
+                                <td><StatusBadge status={p.status} /></td>
+                                <td style={{ color: theme.textMuted }}>{fmtDate(p.created_at)}</td>
+                                <td style={{ color: theme.textMuted }}>{fmtDate(p.updated_at)}</td>
+                            </tr>
+                        ))
+                }
                 </tbody>
             </TableWrap>
+
+            {!loading && totalPages > 1 && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+                    <p style={{ fontSize: "0.78rem", color: theme.textMuted }}>
+                        Page {page} of {totalPages} · {data?.count} total
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn-ghost" disabled={!data?.previous} onClick={() => setPage(p => p - 1)}>
+                            ← Prev
+                        </button>
+                        <button className="btn-ghost" disabled={!data?.next} onClick={() => setPage(p => p + 1)}>
+                            Next →
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -993,6 +1088,7 @@ export default function DashboardPage() {
     const [sidebarOpen,  setSidebarOpen]  = useState(true);
     const [studentCount, setStudentCount] = useState<number>(0);
     const [noticeCount, setNoticeCount] = useState<number>(0);
+    const [paymentCount, setPaymentCount] = useState<number>(0);
 
     function handleSignOut() {
         localStorage.removeItem("access_token");
@@ -1036,7 +1132,7 @@ export default function DashboardPage() {
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
                         />
                         <StatCard
-                            label="Total Payments" value={MOCK_PAYMENTS.length} variant="stat-card-blue"
+                            label="Total Payments" value={paymentCount || "…"} variant="stat-card-blue"
                             iconColor={theme.accentBlue}
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>}
                         />
@@ -1048,7 +1144,7 @@ export default function DashboardPage() {
                     </div>
 
                     {activeTab === "Students" && <StudentsTabWithCount onCount={setStudentCount}/>}
-                    {activeTab === "Payments" && <PaymentsTab/>}
+                    {activeTab === "Payments" && <PaymentsTab onCount={setPaymentCount} />}
                     {activeTab === "Notice" && <NoticeTabWithCount onCount={setNoticeCount} />}
                 </main>
             </div>
