@@ -104,26 +104,21 @@ function initials(name: string) {
 
 /* -- Inline styles matching login page theme ------------------------------- */
 const theme = {
-    /* Backgrounds */
     bgPage:        "#0d1526",
     bgSidebar:     "#0a1020",
     bgCard:        "rgba(255,255,255,0.04)",
     bgCardHover:   "rgba(255,255,255,0.07)",
     bgInput:       "rgba(255,255,255,0.06)",
     bgHeader:      "rgba(10,16,32,0.85)",
-    /* Borders */
     border:        "rgba(255,255,255,0.08)",
     borderFocus:   "rgba(56,189,248,0.6)",
-    /* Text */
     textPrimary:   "#f0f4ff",
     textSecondary: "rgba(240,244,255,0.5)",
     textMuted:     "rgba(240,244,255,0.3)",
-    /* Accents */
     accentBlue:    "#38bdf8",
     accentBlueDim: "rgba(56,189,248,0.15)",
     accentGold:    "#f0a832",
     accentGoldDim: "rgba(240,168,50,0.15)",
-    /* Status */
     success:       "#34d399",
     successDim:    "rgba(52,211,153,0.12)",
     warning:       "#fbbf24",
@@ -132,7 +127,7 @@ const theme = {
     dangerDim:     "rgba(248,113,113,0.12)",
 };
 
-/* -- CSS injection (global styles matching login page) --------------------- */
+/* -- CSS injection --------------------------------------------------------- */
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -145,7 +140,6 @@ const GLOBAL_CSS = `
     min-height: 100vh;
   }
 
-  /* App shell */
   .app-shell {
     display: grid;
     grid-template-columns: var(--sw, 240px) 1fr;
@@ -155,7 +149,6 @@ const GLOBAL_CSS = `
   }
   .app-shell.collapsed { --sw: 68px; }
 
-  /* Sidebar */
   .app-sidebar {
     grid-row: 1 / -1;
     background: ${theme.bgSidebar};
@@ -168,7 +161,6 @@ const GLOBAL_CSS = `
     height: 100vh;
   }
 
-  /* Header */
   .app-header {
     background: ${theme.bgHeader};
     backdrop-filter: blur(12px);
@@ -183,14 +175,12 @@ const GLOBAL_CSS = `
     z-index: 10;
   }
 
-  /* Main */
   .app-main {
     padding: 32px;
     overflow-y: auto;
     background: ${theme.bgPage};
   }
 
-  /* Nav items */
   .nav-item {
     display: flex;
     align-items: center;
@@ -212,15 +202,12 @@ const GLOBAL_CSS = `
   .nav-item:hover { background: rgba(255,255,255,0.06); color: ${theme.textPrimary}; }
   .nav-item.active { background: rgba(56,189,248,0.12); color: ${theme.accentBlue}; }
 
-  /* Table */
   .data-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.82rem;
   }
-  .data-table thead tr {
-    border-bottom: 1px solid ${theme.border};
-  }
+  .data-table thead tr { border-bottom: 1px solid ${theme.border}; }
   .data-table th {
     text-align: left;
     padding: 11px 16px;
@@ -237,7 +224,6 @@ const GLOBAL_CSS = `
   .data-table tbody tr:hover { background: rgba(255,255,255,0.03); }
   .data-table td { padding: 13px 16px; color: ${theme.textSecondary}; vertical-align: middle; }
 
-  /* Inputs */
   .dark-input {
     background: ${theme.bgInput};
     border: 1px solid ${theme.border};
@@ -254,7 +240,21 @@ const GLOBAL_CSS = `
   .dark-input:focus { border-color: ${theme.borderFocus}; }
   textarea.dark-input { resize: vertical; line-height: 1.6; }
 
-  /* Buttons */
+  /* Select override for dark theme */
+  select.dark-input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(240,244,255,0.3)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+  select.dark-input option {
+    background: #0d1526;
+    color: #f0f4ff;
+  }
+
   .btn-primary {
     background: ${theme.accentBlue};
     color: #0a1020;
@@ -285,6 +285,13 @@ const GLOBAL_CSS = `
   }
   .btn-ghost:hover { background: rgba(255,255,255,0.1); color: ${theme.textPrimary}; }
   .btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Active filter button */
+  .btn-ghost.filter-active {
+    background: rgba(56,189,248,0.12);
+    color: ${theme.accentBlue};
+    border-color: rgba(56,189,248,0.3);
+  }
 
   .btn-detail {
     background: ${theme.accentBlueDim};
@@ -331,7 +338,6 @@ const GLOBAL_CSS = `
   }
   .btn-delete:hover { background: rgba(248,113,113,0.22); }
 
-  /* Avatar */
   .avatar-circle {
     width: 32px;
     height: 32px;
@@ -348,7 +354,6 @@ const GLOBAL_CSS = `
     border: 1px solid rgba(56,189,248,0.2);
   }
 
-  /* Stat cards */
   .stat-card {
     border-radius: 14px;
     padding: 22px 24px;
@@ -372,7 +377,6 @@ const GLOBAL_CSS = `
   .stat-card-label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
   .stat-card-value { font-size: 2.4rem; font-weight: 700; line-height: 1; }
 
-  /* Card surface */
   .dark-card {
     background: rgba(255,255,255,0.035);
     border: 1px solid ${theme.border};
@@ -380,7 +384,6 @@ const GLOBAL_CSS = `
     overflow: hidden;
   }
 
-  /* Skeleton */
   @keyframes shimmer {
     0%   { opacity: 0.3; }
     50%  { opacity: 0.7; }
@@ -388,16 +391,13 @@ const GLOBAL_CSS = `
   }
   .skeleton { height: 13px; border-radius: 4px; background: rgba(255,255,255,0.08); animation: shimmer 1.5s ease-in-out infinite; }
 
-  /* Fade in */
   @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
   .fade-up { animation: fadeUp 0.3s ease forwards; }
 
-  /* Breadcrumb */
   .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
   .breadcrumb-sep { color: ${theme.textMuted}; }
   .breadcrumb-active { color: ${theme.accentBlue}; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.7rem; }
 
-  /* Error banner */
   .error-banner {
     background: ${theme.dangerDim};
     border: 1px solid rgba(248,113,113,0.2);
@@ -411,13 +411,47 @@ const GLOBAL_CSS = `
     margin-bottom: 16px;
   }
 
-  /* Search wrapper */
   .search-wrap { position: relative; }
   .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-  .search-wrap .dark-input { padding-left: 34px; width: 230px; }
+  .search-wrap .dark-input { padding-left: 34px; }
 
-  /* Monospace */
   .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* Active filter chip */
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(56,189,248,0.1);
+    color: ${theme.accentBlue};
+    border: 1px solid rgba(56,189,248,0.25);
+    border-radius: 20px;
+    padding: 3px 10px 3px 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .filter-chip button {
+    background: none;
+    border: none;
+    color: ${theme.accentBlue};
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    opacity: 0.7;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+  }
+  .filter-chip button:hover { opacity: 1; }
 `;
 
 /* -- CSS injector ---------------------------------------------------------- */
@@ -475,19 +509,48 @@ function SkeletonRow({ cols }: { cols: number }) {
     );
 }
 
+/* -- Filter chip ----------------------------------------------------------- */
+function FilterChip({ label, value, onRemove }: { label: string; value: string; onRemove: () => void }) {
+    return (
+        <span className="filter-chip">
+            <span style={{ opacity: 0.6 }}>{label}:</span> {value}
+            <button onClick={onRemove} title="Remove filter">×</button>
+        </span>
+    );
+}
+
 /* -- Payments tab ---------------------------------------------------------- */
 function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
-    const [data,    setData]    = useState<PaymentListResponse | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState("");
-    const [page,    setPage]    = useState(1);
+    const [data,          setData]          = useState<PaymentListResponse | null>(null);
+    const [loading,       setLoading]       = useState(true);
+    const [error,         setError]         = useState("");
+    const [page,          setPage]          = useState(1);
+    const [search,        setSearch]        = useState("");
+    const [statusFilter,  setStatusFilter]  = useState("");
+    const [methodFilter,  setMethodFilter]  = useState("");
     const PAGE_SIZE = 10;
+
+    const PAYMENT_STATUSES  = ["pending", "completed", "failed"];
+    const PAYMENT_METHODS   = ["cash", "esewa", "khalti", "bank_transfer", "card"];
+
+    function resetFilters() {
+        setSearch("");
+        setStatusFilter("");
+        setMethodFilter("");
+        setPage(1);
+    }
+
+    const hasActiveFilters = search || statusFilter || methodFilter;
 
     useEffect(() => {
         setLoading(true);
         setError("");
         const token = localStorage.getItem("access_token");
         const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        if (search)       params.set("search",         search);
+        if (statusFilter) params.set("status",         statusFilter);
+        if (methodFilter) params.set("payment_method", methodFilter);
+
         fetch(`${BASE_URL}${API_VERSION}/payment/all-payments/?${params}`, {
             headers: { Authorization: `Bearer ${token}` },
         })
@@ -505,13 +568,14 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
             .then((d: PaymentListResponse) => { setData(d); onCount(d.count); })
             .catch(e => setError(e.message))
             .finally(() => setLoading(false));
-    }, [page]);
+    }, [page, search, statusFilter, methodFilter]);
 
     const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
 
     return (
         <div className="fade-up">
-            <div style={{ marginBottom: 24 }}>
+            {/* Header */}
+            <div style={{ marginBottom: 20 }}>
                 <h2 style={{ color: theme.textPrimary, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>
                     Payments
                 </h2>
@@ -520,13 +584,70 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                 </p>
             </div>
 
+            {/* Filter bar */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                <div className="filter-bar">
+                    {/* Search */}
+                    <div className="search-wrap" style={{ flex: "1 1 200px", maxWidth: 260 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textMuted} strokeWidth="2" strokeLinecap="round">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input
+                            className="dark-input"
+                            placeholder="Search by student or class…"
+                            value={search}
+                            onChange={e => { setSearch(e.target.value); setPage(1); }}
+                        />
+                    </div>
+
+                    {/* Status filter */}
+                    <select
+                        className="dark-input"
+                        style={{ width: "auto", minWidth: 140 }}
+                        value={statusFilter}
+                        onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                    >
+                        <option value="">All Statuses</option>
+                        {PAYMENT_STATUSES.map(s => (
+                            <option key={s} value={s}>{capitalize(s)}</option>
+                        ))}
+                    </select>
+
+                    {/* Method filter */}
+                    <select
+                        className="dark-input"
+                        style={{ width: "auto", minWidth: 160 }}
+                        value={methodFilter}
+                        onChange={e => { setMethodFilter(e.target.value); setPage(1); }}
+                    >
+                        <option value="">All Methods</option>
+                        {PAYMENT_METHODS.map(m => (
+                            <option key={m} value={m}>{capitalize(m.replace("_", " "))}</option>
+                        ))}
+                    </select>
+
+                    {/* Reset */}
+                    {hasActiveFilters && (
+                        <button className="btn-ghost" onClick={resetFilters} style={{ whiteSpace: "nowrap" }}>
+                            Clear filters
+                        </button>
+                    )}
+                </div>
+
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {search        && <FilterChip label="Search"  value={search}                          onRemove={() => { setSearch("");       setPage(1); }} />}
+                        {statusFilter  && <FilterChip label="Status"  value={capitalize(statusFilter)}        onRemove={() => { setStatusFilter("");  setPage(1); }} />}
+                        {methodFilter  && <FilterChip label="Method"  value={capitalize(methodFilter.replace("_"," "))} onRemove={() => { setMethodFilter("");  setPage(1); }} />}
+                    </div>
+                )}
+            </div>
+
             {error && (
                 <div className="error-banner">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         strokeWidth="2" strokeLinecap="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="12"/>
-                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
                     {error}
                 </div>
@@ -573,12 +694,8 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                         Page {page} of {totalPages} · {data?.count} total
                     </p>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn-ghost" disabled={!data?.previous} onClick={() => setPage(p => p - 1)}>
-                            ← Prev
-                        </button>
-                        <button className="btn-ghost" disabled={!data?.next} onClick={() => setPage(p => p + 1)}>
-                            Next →
-                        </button>
+                        <button className="btn-ghost" disabled={!data?.previous} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                        <button className="btn-ghost" disabled={!data?.next}     onClick={() => setPage(p => p + 1)}>Next →</button>
                     </div>
                 </div>
             )}
@@ -633,7 +750,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
             const data = await res.json();
 
             if (!res.ok) {
-                // Surface backend validation errors (e.g. special char on title)
                 if (data?.title)       setErrors(v => ({ ...v, title: data.title[0] }));
                 if (data?.description) setErrors(v => ({ ...v, description: data.description[0] }));
                 if (!data?.title && !data?.description)
@@ -641,7 +757,7 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
                 return;
             }
 
-            onSave(); // success → parent refreshes list and switches view
+            onSave();
         } catch {
             setApiError("Network error. Please try again.");
         } finally {
@@ -651,7 +767,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
 
     return (
         <div className="fade-up">
-            {/* Back breadcrumb */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
                 <button onClick={onBack} className="btn-ghost"
                         style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px" }}>
@@ -664,7 +779,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
             </div>
 
             <div className="dark-card" style={{ maxWidth: 560 }}>
-                {/* Card header */}
                 <div style={{ padding: "22px 28px", borderBottom: `1px solid ${theme.border}` }}>
                     <h2 style={{ color: theme.textPrimary, fontSize: "1.05rem", fontWeight: 700, margin: 0 }}>
                         Create Notice
@@ -675,7 +789,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
                 </div>
 
                 <div style={{ padding: 28 }}>
-                    {/* API-level error */}
                     {apiError && (
                         <div className="error-banner" style={{ marginBottom: 18 }}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -688,7 +801,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
                         </div>
                     )}
 
-                    {/* Title */}
                     <div style={{ marginBottom: 18 }}>
                         <label style={{ display: "block", marginBottom: 7, fontSize: "0.68rem", fontWeight: 600,
                             letterSpacing: "0.08em", textTransform: "uppercase", color: theme.textMuted }}>
@@ -706,7 +818,6 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
                         )}
                     </div>
 
-                    {/* Description */}
                     <div style={{ marginBottom: 18 }}>
                         <label style={{ display: "block", marginBottom: 7, fontSize: "0.68rem", fontWeight: 600,
                             letterSpacing: "0.08em", textTransform: "uppercase", color: theme.textMuted }}>
@@ -793,11 +904,10 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
 
     useEffect(() => { fetchNotices(page); }, [page]);
 
-    // Called by NoticeForm on successful save
     function handleSaved() {
         setView("list");
         setPage(1);
-        fetchNotices(1); // refresh immediately
+        fetchNotices(1);
     }
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -856,10 +966,10 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                                 <td style={{ color: theme.textMuted, fontSize: "0.78rem" }}>{n.id}</td>
                                 <td style={{ fontWeight: 600, color: theme.textPrimary }}>{n.title}</td>
                                 <td style={{ maxWidth: 320, color: theme.textSecondary }}>
-                                        <span style={{ display: "-webkit-box", WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                            {n.description}
-                                        </span>
+                                    <span style={{ display: "-webkit-box", WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                        {n.description}
+                                    </span>
                                 </td>
                                 <td style={{ color: theme.textMuted }}>{fmtDate(n.created_at)}</td>
                                 <td style={{ color: theme.textMuted }}>{fmtDate(n.updated_at)}</td>
@@ -869,19 +979,14 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 </tbody>
             </TableWrap>
 
-            {/* Pagination */}
             {!loading && totalPages > 1 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
                     <p style={{ fontSize: "0.78rem", color: theme.textMuted }}>
                         Page {page} of {totalPages} · {total} total
                     </p>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn-ghost" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                            ← Prev
-                        </button>
-                        <button className="btn-ghost" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                            Next →
-                        </button>
+                        <button className="btn-ghost" disabled={page === 1}          onClick={() => setPage(p => p - 1)}>← Prev</button>
+                        <button className="btn-ghost" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
                     </div>
                 </div>
             )}
@@ -928,7 +1033,6 @@ export function DashboardSidebar({
 }) {
     return (
         <aside className="app-sidebar">
-            {/* Logo */}
             <div style={{padding:"18px 16px",display:"flex",alignItems:"center",gap:12,borderBottom:`1px solid ${theme.border}`}}>
                 <div style={{width:38,height:38,borderRadius:10,background:"rgba(56,189,248,0.12)",border:`1px solid rgba(56,189,248,0.2)`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.accentBlue} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -943,7 +1047,6 @@ export function DashboardSidebar({
                 )}
             </div>
 
-            {/* Nav */}
             <nav style={{flex:1,padding:"10px 8px"}}>
                 {TABS.map(tab => {
                     const active = activeTab === tab;
@@ -960,7 +1063,6 @@ export function DashboardSidebar({
                 })}
             </nav>
 
-            {/* Bottom */}
             <div style={{padding:"10px 8px",borderTop:`1px solid ${theme.border}`}}>
                 <button onClick={onSignOut} className="nav-item" style={{marginBottom:4,justifyContent:sidebarOpen?"flex-start":"center"}}>
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -979,51 +1081,133 @@ export function DashboardSidebar({
     );
 }
 
-/* -- Students tab (with count callback) ------------------------------------ */
+/* -- Students tab ---------------------------------------------------------- */
 function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
     const router = useRouter();
-    const [data,    setData]    = useState<StudentListResponse|null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState("");
-    const [page,    setPage]    = useState(1);
-    const [search,  setSearch]  = useState("");
+    const [data,          setData]          = useState<StudentListResponse|null>(null);
+    const [loading,       setLoading]       = useState(true);
+    const [error,         setError]         = useState("");
+    const [page,          setPage]          = useState(1);
+    const [search,        setSearch]        = useState("");
+    const [classFilter,   setClassFilter]   = useState("");
+    const [statusFilter,  setStatusFilter]  = useState("");
     const PAGE_SIZE = 10;
+
+    // Adjust these to match your actual grade/class options
+    const STUDENT_CLASSES  = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+    const STUDENT_STATUSES = ["pending", "approved", "rejected"];
+
+    function resetFilters() {
+        setSearch("");
+        setClassFilter("");
+        setStatusFilter("");
+        setPage(1);
+    }
+
+    const hasActiveFilters = search || classFilter || statusFilter;
 
     useEffect(()=>{
         setLoading(true); setError("");
         const token = localStorage.getItem("access_token");
-        const params = new URLSearchParams({page:String(page), page_size:String(PAGE_SIZE)});
-        if (search) params.set("search", search);
-        fetch(`${BASE_URL}${API_VERSION}/student/list/?${params}`,{headers:{Authorization:`Bearer ${token}`}})
-            .then(r=>{ if(!r.ok) throw new Error(`Error ${r.status}`); return r.json(); })
-            .then((d:StudentListResponse)=>{ setData(d); onCount(d.count); })
-            .catch(e=>setError(e.message))
-            .finally(()=>setLoading(false));
-    },[page,search]);
+        const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+        if (search)       params.set("search",        search);
+        if (classFilter)  params.set("student_class", classFilter);
+        if (statusFilter) params.set("status",        statusFilter);
 
-    const totalPages = data ? Math.ceil(data.count/PAGE_SIZE) : 1;
+        fetch(`${BASE_URL}${API_VERSION}/student/list/?${params}`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => {
+                if (r.status === 401) {
+                    localStorage.removeItem("access_token");
+                    localStorage.removeItem("refresh_token");
+                    localStorage.removeItem("user");
+                    window.location.href = "/login";
+                    throw new Error("Unauthorized");
+                }
+                if (!r.ok) throw new Error(`Error ${r.status}`);
+                return r.json();
+            })
+            .then((d: StudentListResponse) => { setData(d); onCount(d.count); })
+            .catch(e => setError(e.message))
+            .finally(() => setLoading(false));
+    }, [page, search, classFilter, statusFilter]);
+
+    const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
 
     return (
         <div className="fade-up">
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24,gap:16,flexWrap:"wrap"}}>
-                <div>
-                    <h2 style={{color:theme.textPrimary,fontSize:"1.35rem",fontWeight:700,margin:0}}>Students</h2>
-                    <p style={{color:theme.textMuted,fontSize:"0.78rem",marginTop:4}}>
-                        {data ? `${data.count} record${data.count!==1?"s":""} found` : "Loading…"}
-                    </p>
+            {/* Header */}
+            <div style={{ marginBottom: 20 }}>
+                <h2 style={{ color: theme.textPrimary, fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>Students</h2>
+                <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
+                    {data ? `${data.count} record${data.count !== 1 ? "s" : ""} found` : "Loading…"}
+                </p>
+            </div>
+
+            {/* Filter bar */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                <div className="filter-bar">
+                    {/* Search */}
+                    <div className="search-wrap" style={{ flex: "1 1 200px", maxWidth: 260 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textMuted} strokeWidth="2" strokeLinecap="round">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        <input
+                            className="dark-input"
+                            placeholder="Search by name, phone, year…"
+                            value={search}
+                            onChange={e => { setSearch(e.target.value); setPage(1); }}
+                        />
+                    </div>
+
+                    {/* Class filter */}
+                    <select
+                        className="dark-input"
+                        style={{ width: "auto", minWidth: 140 }}
+                        value={classFilter}
+                        onChange={e => { setClassFilter(e.target.value); setPage(1); }}
+                    >
+                        <option value="">All Classes</option>
+                        {STUDENT_CLASSES.map(c => (
+                            <option key={c} value={c}>Grade {c}</option>
+                        ))}
+                    </select>
+
+                    {/* Status filter */}
+                    <select
+                        className="dark-input"
+                        style={{ width: "auto", minWidth: 150 }}
+                        value={statusFilter}
+                        onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                    >
+                        <option value="">All Statuses</option>
+                        {STUDENT_STATUSES.map(s => (
+                            <option key={s} value={s}>{capitalize(s)}</option>
+                        ))}
+                    </select>
+
+                    {/* Reset */}
+                    {hasActiveFilters && (
+                        <button className="btn-ghost" onClick={resetFilters} style={{ whiteSpace: "nowrap" }}>
+                            Clear filters
+                        </button>
+                    )}
                 </div>
-                <div className="search-wrap">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textMuted} strokeWidth="2" strokeLinecap="round">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input className="dark-input" placeholder="Search students…" value={search}
-                           onChange={e=>{setSearch(e.target.value);setPage(1);}}/>
-                </div>
+
+                {/* Active filter chips */}
+                {hasActiveFilters && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {search       && <FilterChip label="Search" value={search}                   onRemove={() => { setSearch("");      setPage(1); }} />}
+                        {classFilter  && <FilterChip label="Class"  value={`Grade ${classFilter}`}   onRemove={() => { setClassFilter("");  setPage(1); }} />}
+                        {statusFilter && <FilterChip label="Status" value={capitalize(statusFilter)} onRemove={() => { setStatusFilter(""); setPage(1); }} />}
+                    </div>
+                )}
             </div>
 
             {error && (
                 <div className="error-banner">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
                     {error}
                 </div>
             )}
@@ -1058,7 +1242,6 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                                 <td>
                                     <div style={{display:"flex",gap:6,flexWrap:"nowrap"}}>
                                         <button className="btn-detail" onClick={()=>router.push(`/dashboard/students/${s.id}`)}>Approve</button>
-                                        {/*<button className="btn-edit">Edit</button>*/}
                                         <button className="btn-delete">Delete</button>
                                     </div>
                                 </td>
@@ -1073,7 +1256,7 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                     <p style={{fontSize:"0.78rem",color:theme.textMuted}}>Page {page} of {totalPages} · {data.count} total</p>
                     <div style={{display:"flex",gap:8}}>
                         <button className="btn-ghost" disabled={!data.previous} onClick={()=>setPage(p=>p-1)}>← Prev</button>
-                        <button className="btn-ghost" disabled={!data.next} onClick={()=>setPage(p=>p+1)}>Next →</button>
+                        <button className="btn-ghost" disabled={!data.next}     onClick={()=>setPage(p=>p+1)}>Next →</button>
                     </div>
                 </div>
             )}
@@ -1087,7 +1270,7 @@ export default function DashboardPage() {
     const [activeTab,    setActiveTab]    = useState<Tab>("Students");
     const [sidebarOpen,  setSidebarOpen]  = useState(true);
     const [studentCount, setStudentCount] = useState<number>(0);
-    const [noticeCount, setNoticeCount] = useState<number>(0);
+    const [noticeCount,  setNoticeCount]  = useState<number>(0);
     const [paymentCount, setPaymentCount] = useState<number>(0);
 
     function handleSignOut() {
@@ -1106,7 +1289,6 @@ export default function DashboardPage() {
                     onSignOut={handleSignOut}
                 />
 
-                {/* Header */}
                 <header className="app-header">
                     <div className="breadcrumb">
                         <span style={{color:theme.textMuted,fontSize:"0.75rem"}}>Dashboard</span>
@@ -1122,9 +1304,7 @@ export default function DashboardPage() {
                     </div>
                 </header>
 
-                {/* Main content */}
                 <main className="app-main">
-                    {/* Stat cards */}
                     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:32}}>
                         <StatCard
                             label="Total Students" value={studentCount || "—"} variant="stat-card-navy"
@@ -1132,7 +1312,7 @@ export default function DashboardPage() {
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
                         />
                         <StatCard
-                            label="Total Payments" value={paymentCount || "…"} variant="stat-card-blue"
+                            label="Total Payments" value={paymentCount || "—"} variant="stat-card-blue"
                             iconColor={theme.accentBlue}
                             icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>}
                         />
@@ -1145,7 +1325,7 @@ export default function DashboardPage() {
 
                     {activeTab === "Students" && <StudentsTabWithCount onCount={setStudentCount}/>}
                     {activeTab === "Payments" && <PaymentsTab onCount={setPaymentCount} />}
-                    {activeTab === "Notice" && <NoticeTabWithCount onCount={setNoticeCount} />}
+                    {activeTab === "Notice"   && <NoticeTabWithCount onCount={setNoticeCount} />}
                 </main>
             </div>
         </>
