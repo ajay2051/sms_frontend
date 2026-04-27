@@ -233,6 +233,15 @@ export default function PaymentPage() {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data?.detail ?? `Error ${res.status}`);
             }
+
+            const data = await res.json();
+
+            // Khalti: redirect to hosted payment page
+            if (selectedMethod === "khalti_ime" && data?.payment_url) {
+                window.location.href = data.payment_url;
+                return; // don't show success screen — user is leaving the page
+            }
+
             setTxnId(txn);
             setSuccess(true);
         } catch (err: any) {
