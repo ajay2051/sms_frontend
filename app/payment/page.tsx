@@ -236,6 +236,25 @@ export default function PaymentPage() {
 
             const data = await res.json();
 
+            // eSewa: POST form submission to eSewa's endpoint
+            if (selectedMethod === "esewa" && data?.base_url && data?.data) {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = data.base_url;
+
+                Object.entries(data.data).forEach(([key, value]) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = key;
+                    input.value = String(value);
+                    form.appendChild(input);
+                });
+
+                document.body.appendChild(form);
+                form.submit();
+                return;
+            }
+
             // Khalti: redirect to hosted payment page
             if (selectedMethod === "khalti_ime" && data?.payment_url) {
                 window.location.href = data.payment_url;
