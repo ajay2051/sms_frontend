@@ -261,6 +261,12 @@ export default function PaymentPage() {
                 return; // don't show success screen — user is leaving the page
             }
 
+            // Khalti & Stripe: redirect to hosted payment page
+            if ((selectedMethod === "khalti_ime" || selectedMethod === "stripe") && data?.payment_url) {
+                window.location.href = data.payment_url;
+                return;
+            }
+
             setTxnId(txn);
             setSuccess(true);
         } catch (err: any) {
