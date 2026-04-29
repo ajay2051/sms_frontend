@@ -111,9 +111,7 @@ interface StudentData {
 function formatNPR(amount: number) {
     return new Intl.NumberFormat("en-NP").format(amount);
 }
-function generateTxnId() {
-    return "TXN" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
-}
+
 
 /* ── Shimmer skeleton ────────────────────────────────────────────────── */
 function Skeleton({ style: extraStyle = {} }: { style?: React.CSSProperties }) {
@@ -208,26 +206,30 @@ export default function PaymentPage() {
             ? (MONTHLY_FEES[studentClass] ?? 0)
             : (ADMISSION_FEES[studentClass] ?? 0)
         : 0;
-    const appFee     = (!fromFee && student) ? parseFloat(student.application_fee ?? "0") : 0;
-    const grandTotal = totalAmount + appFee;
+
+// grandTotal is simply totalAmount — fees are always paid separately
+    const grandTotal = totalAmount;
 
     async function handlePay() {
         if (!selectedMethod || !student) return;
         setSubmitting(true);
         setApiError("");
-        const txn = generateTxnId();
         try {
+            const payload: Record<string, unknown> = {
+                total_amount: grandTotal,
+                payment_method: selectedMethod === "khalti_ime" ? "khalti" : selectedMethod,
+                status: "pending",
+                student: student.id,
+                ...(fromFee && { monthly_fee: totalAmount }),
+            };
+
             const res = await fetch(`${BASE_URL}${API_VERSION}/payment/create/`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    txn_id: txn,
-                    total_amount: grandTotal,
-                    payment_method: selectedMethod,
-                    status: "pending",
-                    student: student.id,
-                    monthly_fee: totalAmount,
-                }),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
+                },
+                body: JSON.stringify(payload),
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
@@ -267,7 +269,7 @@ export default function PaymentPage() {
                 return;
             }
 
-            setTxnId(txn);
+            setTxnId(data?.txn_id ?? "");
             setSuccess(true);
         } catch (err: any) {
             setApiError(err.message ?? "Something went wrong");
@@ -549,8 +551,7 @@ export default function PaymentPage() {
                                 {/* Fee rows */}
                                 <div>
                                     {[
-                                        { label: fromFee ? `Monthly Fee (Grade ${studentClass})` : `Monthly Tuition Fee (Grade ${studentClass})`, amount: totalAmount },
-                                        ...(!fromFee ? [{ label: "Application Fee", amount: appFee }] : []),
+                                        { label: fromFee ? `Monthly Fee (Grade ${studentClass})` : `Admission Fee (Grade ${studentClass})`, amount: totalAmount },
                                     ].map((row, i) => (
                                         <div key={i} className="payment-fee-row">
                                             <span style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.55)" }}>{row.label}</span>
