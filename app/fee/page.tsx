@@ -50,6 +50,7 @@ export default function FeePage() {
     const [submitting, setSubmitting]         = useState(false);
     const [success, setSuccess]               = useState(false);
     const [successMonths, setSuccessMonths]   = useState<string[]>([]);
+    const [feeIds, setFeeIds]                 = useState<number[]>([]);
     const [apiError, setApiError]             = useState("");
 
     function toggleMonth(month: string) {
@@ -72,12 +73,13 @@ export default function FeePage() {
         setSubmitting(true);
         setApiError("");
         try {
+            const ids: number[] = [];
             for (const month of selectedMonths) {
                 const res = await fetch(`${BASE_URL}${API_VERSION}/fee/create/`, {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-                        "Content-Type": "application/json",   // ✅ THIS LINE FIXES IT
+                        "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ month }),
                 });
@@ -85,12 +87,10 @@ export default function FeePage() {
                     const data = await res.json().catch(() => ({}));
                     throw new Error(`${month}: ${data?.detail ?? `Error ${res.status}`}`);
                 }
+                const data = await res.json();
+                ids.push(data?.id ?? data?.data?.id);
             }
-            setSuccessMonths([...selectedMonths]);
-            setSuccess(true);
-            setTimeout(() => {
-                router.push("/payment?from=fee");
-            }, 1500);
+            router.push(`/payment?from=fee&fee_ids=${ids.join(",")}`);
         } catch (err: any) {
             setApiError(err.message ?? "Something went wrong");
         } finally {
@@ -98,85 +98,6 @@ export default function FeePage() {
         }
     }
 
-    /* ── Success screen ───────────────────────────────────────────────── */
-    if (success) return (
-        <div className="animate-fade-up" style={{
-            minHeight: "100vh", background: "var(--navy-900)",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: "1.25rem", textAlign: "center", padding: "2rem",
-        }}>
-            <style>{`
-                @keyframes pulse-ring {
-                    0%   { transform: scale(0.85); opacity: 0.8; }
-                    50%  { transform: scale(1.05); opacity: 0.4; }
-                    100% { transform: scale(0.85); opacity: 0.8; }
-                }
-                .fee-pulse-ring { animation: pulse-ring 2s ease-in-out infinite; }
-            `}</style>
-
-            <div style={{ position: "relative" }}>
-                <div className="fee-pulse-ring" style={{
-                    position: "absolute", inset: -10, borderRadius: "9999px",
-                    background: "rgba(22,144,216,0.2)",
-                }} />
-                <div style={{
-                    width: 80, height: 80, borderRadius: "9999px", position: "relative",
-                    background: "linear-gradient(135deg, var(--sky-400), var(--navy-700))",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                </div>
-            </div>
-
-            <div>
-                <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.875rem", fontWeight: 700, color: "var(--white)", marginBottom: "0.5rem" }}>
-                    Fee Submitted
-                </h1>
-                <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.5)", maxWidth: 380, lineHeight: 1.75 }}>
-                    Monthly fee records have been created for the following months.
-                </p>
-            </div>
-
-            {/* Month pills */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center", maxWidth: 400 }}>
-                {successMonths.map(m => (
-                    <span key={m} style={{
-                        padding: "0.3rem 0.875rem", borderRadius: "9999px",
-                        fontSize: "0.75rem", fontWeight: 700,
-                        letterSpacing: "0.05em", textTransform: "uppercase",
-                        background: "rgba(22,144,216,0.18)", color: "var(--sky-300)",
-                        border: "1px solid rgba(22,144,216,0.3)",
-                    }}>{m}</span>
-                ))}
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
-                <button
-                    onClick={() => { setSuccess(false); setSelectedMonths([]); }}
-                    style={{
-                        padding: "0.65rem 1.5rem", borderRadius: "9999px",
-                        background: "rgba(255,255,255,0.08)", color: "var(--white)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer",
-                    }}
-                >
-                    Submit Another
-                </button>
-                <button
-                    onClick={() => router.push("/")}
-                    style={{
-                        padding: "0.65rem 1.5rem", borderRadius: "9999px",
-                        background: "var(--sky-500)", color: "white", border: "none",
-                        fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer",
-                    }}
-                >
-                    Go to Dashboard
-                </button>
-            </div>
-        </div>
-    );
 
     /* ── Main page ────────────────────────────────────────────────────── */
     return (

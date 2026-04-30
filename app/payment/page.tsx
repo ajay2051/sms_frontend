@@ -28,7 +28,7 @@ function parseClassNumber(raw: string | null | undefined): number | null {
 }
 
 /* ── Payment methods ─────────────────────────────────────────────────── */
-type PaymentMethod = "esewa" | "khalti_ime" | "stripe";
+type PaymentMethod = "esewa" | "khalti" | "stripe";
 
 interface PaymentMethodOption {
     id: PaymentMethod;
@@ -83,7 +83,7 @@ const PAYMENT_METHODS: PaymentMethodOption[] = [
         logo: <EsewaLogo />,
     },
     {
-        id: "khalti_ime",
+        id: "khalti",
         name: "Khalti by IME",
         tagline: "Khalti & IME Pay — now one platform",
         color: "rgba(232,0,13,0.12)",
@@ -151,6 +151,10 @@ export default function PaymentPage() {
     const [success, setSuccess]               = useState(false);
     const [txnId, setTxnId]                   = useState("");
     const [apiError, setApiError]             = useState("");
+    const feeIds = (searchParams.get("fee_ids") ?? "")
+        .split(",")
+        .map(Number)
+        .filter(Boolean);
 
     /* ── Detect source page ─────────────────────────────────────────────── */
     const fromFee = searchParams.get("from") === "fee";
@@ -217,10 +221,10 @@ export default function PaymentPage() {
         try {
             const payload: Record<string, unknown> = {
                 total_amount: grandTotal,
-                payment_method: selectedMethod === "khalti_ime" ? "khalti" : selectedMethod,
+                payment_method: selectedMethod === "khalti" ? "khalti" : selectedMethod,
                 status: "pending",
-                student: student.id,
-                ...(fromFee && { monthly_fee: totalAmount }),
+                // student: student.id,
+                ...(fromFee && { monthly_fee: feeIds[0] }),
             };
 
             const res = await fetch(`${BASE_URL}${API_VERSION}/payment/create/`, {
@@ -258,13 +262,13 @@ export default function PaymentPage() {
             }
 
             // Khalti: redirect to hosted payment page
-            if (selectedMethod === "khalti_ime" && data?.payment_url) {
+            if (selectedMethod === "khalti" && data?.payment_url) {
                 window.location.href = data.payment_url;
                 return; // don't show success screen — user is leaving the page
             }
 
             // Khalti & Stripe: redirect to hosted payment page
-            if ((selectedMethod === "khalti_ime" || selectedMethod === "stripe") && data?.payment_url) {
+            if ((selectedMethod === "khalti" || selectedMethod === "stripe") && data?.payment_url) {
                 window.location.href = data.payment_url;
                 return;
             }
