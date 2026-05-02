@@ -75,7 +75,7 @@ export default function RegisterPage() {
     const [email, setEmail]           = useState("");
     const [password, setPassword]     = useState("");
     const [confirmPass, setConfirmPass] = useState("");
-    const [role, setRole]             = useState<"student"|"staff">("student");
+    const [role, setRole]             = useState<"student"|"teacher"|"staff">("student");
     const [showPass, setShowPass]     = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [loading, setLoading]       = useState(false);
@@ -240,6 +240,20 @@ export default function RegisterPage() {
                                         <button type="button" onClick={() => setRole("student")} className={`role-btn${role==="student"?" active":""}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
                                             Student
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setRole("teacher")}
+                                            className={`role-btn${role==="teacher"?" active":""}`}
+                                        >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" strokeWidth="1.8"
+                                                 strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="3" y="4" width="18" height="12" rx="2"/>
+                                                <path d="M8 20h8"/>
+                                                <path d="M12 16v4"/>
+                                            </svg>
+                                            Teacher
                                         </button>
                                         <button type="button" onClick={() => setRole("staff")} className={`role-btn${role==="staff"?" active":""}`}>
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
