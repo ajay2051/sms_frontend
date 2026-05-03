@@ -1,7 +1,9 @@
 "use client";
 import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {useStudentAuthGuard} from "@/hooks/useStudentAuthGuard";
+import { useStudentAuthGuard } from "@/hooks/useStudentAuthGuard";
+import { useMutation } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
@@ -23,7 +25,7 @@ const CLASS_FEES: Record<string, string> = {
     "12": "2500",
 };
 
-/* ── Types ──────────────────────────────────────────────────────────── */
+/* ── Types ──────────────────────────────────────────────────────────────── */
 interface FormData {
     full_name: string;
     phone_number: string;
@@ -39,7 +41,14 @@ interface FormData {
 }
 interface FormErrors { [key: string]: string; }
 
-/* ── Validators ─────────────────────────────────────────────────────── */
+interface StudentResponse {
+    data: {
+        id: string;
+        student_class: string;
+    };
+}
+
+/* ── Validators ─────────────────────────────────────────────────────────── */
 function validateFullName(v: string) {
     if (v.length < 3 || v.length > 50) return "Must be between 3 and 50 characters";
     if ([...v].some(c => SPECIAL_CHARS.has(c))) return "Must not contain special characters";
@@ -83,7 +92,33 @@ function validateAll(form: FormData): FormErrors {
     return e;
 }
 
-/* ── Error message ──────────────────────────────────────────────────── */
+/* ── Axios submit fn ─────────────────────────────────────────────────────── */
+async function submitApplication(form: FormData): Promise<StudentResponse> {
+    const fd = new FormData();
+    (Object.keys(form) as (keyof typeof form)[]).forEach(k => {
+        if (k === "certificates") {
+            form.certificates.forEach(f => fd.append("certificates", f));
+        } else if (k === "profile_pic" && form.profile_pic) {
+            fd.append("profile_pic", form.profile_pic);
+        } else if (typeof form[k] === "string") {
+            fd.append(k, form[k] as string);
+        }
+    });
+
+    const { data } = await axios.post<StudentResponse>(
+        `${BASE_URL}${API_VERSION}/student/create/`,
+        fd,
+        {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                // axios sets Content-Type: multipart/form-data automatically for FormData
+            },
+        }
+    );
+    return data;
+}
+
+/* ── Error message ──────────────────────────────────────────────────────── */
 function ErrorMsg({ msg }: { msg?: string }) {
     if (!msg) return null;
     return (
@@ -96,7 +131,7 @@ function ErrorMsg({ msg }: { msg?: string }) {
     );
 }
 
-/* ── Field wrapper ──────────────────────────────────────────────────── */
+/* ── Field wrapper ──────────────────────────────────────────────────────── */
 function Field({ label, error, required = true, children }: {
     label: string; error?: string; required?: boolean; children: React.ReactNode;
 }) {
@@ -115,7 +150,7 @@ function Field({ label, error, required = true, children }: {
     );
 }
 
-/* ── Input style helper ─────────────────────────────────────────────── */
+/* ── Input style helper ─────────────────────────────────────────────────── */
 const inputStyle = (hasError?: boolean): React.CSSProperties => ({
     width: "100%",
     padding: "0.6rem 0.875rem",
@@ -130,7 +165,7 @@ const inputStyle = (hasError?: boolean): React.CSSProperties => ({
     transition: "border-color 0.2s, box-shadow 0.2s",
 });
 
-/* ── Section card ───────────────────────────────────────────────────── */
+/* ── Section card ───────────────────────────────────────────────────────── */
 function SectionCard({ icon, title, children }: {
     icon: React.ReactNode; title: string; children: React.ReactNode;
 }) {
@@ -160,7 +195,7 @@ function SectionCard({ icon, title, children }: {
     );
 }
 
-/* ── Main page ──────────────────────────────────────────────────────── */
+/* ── Main page ──────────────────────────────────────────────────────────── */
 export default function AdmissionsPage() {
     useStudentAuthGuard();
     const router = useRouter();
@@ -170,14 +205,27 @@ export default function AdmissionsPage() {
         address: "", parents_name: "", relation: "", parents_phone_number: "",
         application_fee: "", profile_pic: null, certificates: [],
     });
-    const [errors,     setErrors]     = useState<FormErrors>({});
-    const [submitting, setSubmitting] = useState(false);
-    const [apiError,   setApiError]   = useState("");
+    const [errors,    setErrors]    = useState<FormErrors>({});
     const [submitted, setSubmitted] = useState(false);
 
     const certRef = useRef<HTMLInputElement>(null);
     const picRef  = useRef<HTMLInputElement>(null);
 
+    /* ── TanStack mutation ── */
+    const mutation = useMutation<StudentResponse, AxiosError<{ detail?: string }>, FormData>({
+        mutationFn: submitApplication,
+        onSuccess: (studentData) => {
+            localStorage.setItem("student_class", studentData.data.student_class);
+            setSubmitted(true);
+            setTimeout(() => router.push(`/payment?student_id=${studentData.data.id}`), 3000);
+        },
+    });
+
+    const apiError = mutation.error
+        ? (mutation.error.response?.data?.detail ?? mutation.error.message ?? "Something went wrong")
+        : "";
+
+    /* ── Field helpers ── */
     function touch(field: string, value: string) {
         let err = "";
         if (field === "full_name")            err = validateFullName(value);
@@ -192,7 +240,6 @@ export default function AdmissionsPage() {
         setForm(prev => ({
             ...prev,
             [field]: value,
-            // Auto-fill fee when class changes
             ...(field === "student_class" && value
                 ? { application_fee: CLASS_FEES[value] ?? "" }
                 : {}),
@@ -200,45 +247,14 @@ export default function AdmissionsPage() {
         touch(field, value);
     }
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const errs = validateAll(form);
         if (Object.values(errs).some(Boolean)) { setErrors(errs); return; }
-        setSubmitting(true);
-        setApiError("");
-        try {
-            const fd = new FormData();
-            (Object.keys(form) as (keyof typeof form)[]).forEach(k => {
-                if (k === "certificates") {
-                    form.certificates.forEach(f => fd.append("certificates", f));
-                } else if (k === "profile_pic" && form.profile_pic) {
-                    fd.append("profile_pic", form.profile_pic);
-                } else if (typeof form[k] === "string") {
-                    fd.append(k, form[k] as string);
-                }
-            });
-            const res = await fetch(`${BASE_URL}${API_VERSION}/student/create/`, {
-                method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-                    },
-                body: fd,
-            });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data?.detail ?? `Error ${res.status}`);
-            }
-            // ── Redirect to payment page with student id from response ──
-            const studentData = await res.json();
-            localStorage.setItem("student_class", studentData.data.student_class);
-            setSubmitted(true);
-            setTimeout(() => router.push(`/payment?student_id=${studentData.data.id}`), 3000);
-        } catch (err: any) {
-            setApiError(err.message ?? "Something went wrong");
-        } finally {
-            setSubmitting(false);
-        }
+        mutation.mutate(form);
     }
+
+    const submitting = mutation.isPending;
 
     const grid2: React.CSSProperties = {
         display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem",
