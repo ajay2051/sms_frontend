@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 import type { Student } from "@/app/dashboard/page";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
@@ -11,7 +13,35 @@ const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 const ADMISSION_STATUSES = ["Pending", "Approved", "Rejected"] as const;
 type AdmissionStatus = typeof ADMISSION_STATUSES[number];
 
-/* -- Helpers --------------------------------------------------------------- */
+/* ── Axios helpers ──────────────────────────────────────────────────────── */
+function authHeaders() {
+    return { Authorization: `Bearer ${localStorage.getItem("access_token")}` };
+}
+
+async function fetchStudent(id: string): Promise<Student> {
+    const { data } = await axios.get(`${BASE_URL}${API_VERSION}/student/retrieve/${id}/`, {
+        headers: authHeaders(),
+    });
+    return data?.data ?? data;
+}
+
+interface ReviewPayload {
+    id: string | number;
+    application_status: string;
+    comments: string | null;
+}
+
+async function updateStudentReview(payload: ReviewPayload): Promise<Student> {
+    const { id, ...body } = payload;
+    const { data } = await axios.patch(
+        `${BASE_URL}${API_VERSION}/student/update/${id}/`,
+        body,
+        { headers: authHeaders() }
+    );
+    return data?.data ?? data;
+}
+
+/* ── Helpers ────────────────────────────────────────────────────────────── */
 function fmtDate(iso: string) {
     try {
         return new Date(iso).toLocaleDateString("en-GB", {
@@ -29,7 +59,7 @@ function initials(name: string | null | undefined) {
     return name.split(" ").filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
-/* -- Loading --------------------------------------------------------------- */
+/* ── Loading ────────────────────────────────────────────────────────────── */
 function LoadingScreen({ message = "Loading..." }: { message?: string }) {
     return (
         <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
@@ -45,7 +75,7 @@ function LoadingScreen({ message = "Loading..." }: { message?: string }) {
     );
 }
 
-/* -- Status pill ----------------------------------------------------------- */
+/* ── Status pill ────────────────────────────────────────────────────────── */
 function StatusPill({ status }: { status: string }) {
     const key = status?.toLowerCase();
     const map: Record<string, { bg: string; color: string }> = {
@@ -66,7 +96,7 @@ function StatusPill({ status }: { status: string }) {
     );
 }
 
-/* -- Frosted card ---------------------------------------------------------- */
+/* ── Frosted card ───────────────────────────────────────────────────────── */
 function GlassCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
     return (
         <div style={{
@@ -82,7 +112,7 @@ function GlassCard({ children, style }: { children: React.ReactNode; style?: Rea
     );
 }
 
-/* -- Section header -------------------------------------------------------- */
+/* ── Section header ─────────────────────────────────────────────────────── */
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
     return (
         <div style={{ display:"flex", alignItems:"center", gap:10,
@@ -93,7 +123,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
     );
 }
 
-/* -- Info row -------------------------------------------------------------- */
+/* ── Info row ───────────────────────────────────────────────────────────── */
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start",
@@ -110,7 +140,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-/* -- Certificate tile ------------------------------------------------------ */
+/* ── Certificate tile ───────────────────────────────────────────────────── */
 function CertTile({ url, index }: { url: string; index: number }) {
     const [hov, setHov] = useState(false);
     const isPdf = url.toLowerCase().endsWith(".pdf");
@@ -160,47 +190,35 @@ function CertTile({ url, index }: { url: string; index: number }) {
     );
 }
 
-/* -- Admin Review Panel ---------------------------------------------------- */
-function AdminReviewPanel({ student, onSaved }: { student: Student; onSaved: (updated: Student) => void }) {
+/* ── Admin Review Panel ─────────────────────────────────────────────────── */
+function AdminReviewPanel({ student }: { student: Student }) {
+    const queryClient = useQueryClient();
+
     const [status,   setStatus]   = useState<AdmissionStatus>(
         (capitalize(student.application_status) as AdmissionStatus) ?? "Pending"
     );
     const [comments, setComments] = useState(student.comments ?? "");
-    const [saving,   setSaving]   = useState(false);
-    const [toast,    setToast]    = useState<{ type: "success"|"error"; msg: string } | null>(null);
+    const [toast,    setToast]    = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
     const isDirty =
         status.toLowerCase()   !== student.application_status?.toLowerCase() ||
         comments.trim()        !== (student.comments ?? "").trim();
 
-    async function handleSave() {
-        setSaving(true);
-        setToast(null);
-        try {
-            const token = localStorage.getItem("access_token");
-
-            const res = await fetch(`${BASE_URL}${API_VERSION}/student/update/${student.id}/`, {
-                method:  "PATCH",
-                headers: {
-                    Authorization:  `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    application_status: status.toLowerCase(),
-                    comments:           comments.trim() || null,
-                }),
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json?.message ?? `Error ${res.status}`);
-            setToast({ type:"success", msg: "Review saved successfully." });
-            onSaved(json.data ?? json);
-        } catch (e: any) {
-            setToast({ type:"error", msg: e.message ?? "Something went wrong." });
-        } finally {
-            setSaving(false);
+    const mutation = useMutation<Student, AxiosError<{ message?: string }>, ReviewPayload>({
+        mutationFn: updateStudentReview,
+        onSuccess: (updated) => {
+            queryClient.setQueryData(["student", String(student.id)], updated);
+            setToast({ type: "success", msg: "Review saved successfully." });
             setTimeout(() => setToast(null), 4000);
-        }
-    }
+        },
+        onError: (err) => {
+            const msg = err.response?.data?.message ?? err.message ?? "Something went wrong.";
+            setToast({ type: "error", msg });
+            setTimeout(() => setToast(null), 4000);
+        },
+    });
+
+    const saving = mutation.isPending;
 
     const statusConfig: Record<AdmissionStatus, { bg: string; border: string; color: string; dot: string }> = {
         Pending:  { bg:"rgba(212,160,23,0.08)",  border:"rgba(212,160,23,0.25)",  color:"#f6e05e", dot:"#f6e05e" },
@@ -279,7 +297,7 @@ function AdminReviewPanel({ student, onSaved }: { student: Student; onSaved: (up
                         Comments
                         <span style={{ marginLeft:8, color:"rgba(255,255,255,0.2)", fontSize:"0.62rem",
                             fontWeight:400, letterSpacing:"0.04em", textTransform:"none" }}>
-                            — visible to admin only, sent to student on review
+                            · visible to admin only, sent to student on review
                         </span>
                     </label>
                     <textarea
@@ -328,7 +346,11 @@ function AdminReviewPanel({ student, onSaved }: { student: Student; onSaved: (up
                         {isDirty ? "You have unsaved changes." : "No unsaved changes."}
                     </p>
                     <button
-                        onClick={handleSave}
+                        onClick={() => mutation.mutate({
+                            id: student.id,
+                            application_status: status.toLowerCase(),
+                            comments: comments.trim() || null,
+                        })}
                         disabled={saving || !isDirty}
                         style={{
                             display:"flex", alignItems:"center", gap:8,
@@ -366,32 +388,22 @@ function AdminReviewPanel({ student, onSaved }: { student: Student; onSaved: (up
     );
 }
 
-/* -- Main page ------------------------------------------------------------- */
+/* ── Main page ──────────────────────────────────────────────────────────── */
 export default function StudentDetailPage() {
     useAuthGuard();
     const router = useRouter();
     const params = useParams();
     const id     = params?.id as string;
 
-    const [student, setStudent] = useState<Student | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState("");
+    const { data: student, isLoading, error } = useQuery<Student, AxiosError>({
+        queryKey: ["student", id],
+        queryFn:  () => fetchStudent(id),
+        enabled:  !!id,
+    });
 
-    useEffect(() => {
-        if (!id) return;
-        const token = localStorage.getItem("access_token");
-        fetch(`${BASE_URL}${API_VERSION}/student/retrieve/${id}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(r => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json(); })
-            .then(json => setStudent(json?.data ?? json))
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [id]);
+    if (isLoading) return <LoadingScreen message="Loading student…"/>;
 
-    if (loading) return <LoadingScreen message="Loading student…"/>;
-
-    /* -- Error state ------------------------------------------------------- */
+    /* ── Error state ────────────────────────────────────────────────────── */
     if (error || !student) return (
         <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column",
             alignItems:"center", justifyContent:"center", gap:16,
@@ -406,7 +418,9 @@ export default function StudentDetailPage() {
                 </svg>
             </div>
             <h2 style={{ fontFamily:"Georgia,serif", color:"white", fontSize:"1.3rem", margin:0 }}>Student Not Found</h2>
-            <p style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.875rem" }}>{error || "No data returned."}</p>
+            <p style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.875rem" }}>
+                {(error as AxiosError)?.message || "No data returned."}
+            </p>
             <button onClick={() => router.back()}
                     style={{ padding:"10px 28px", borderRadius:9999, border:"1.5px solid rgba(22,144,216,0.5)",
                         background:"rgba(22,144,216,0.15)", color:"#38a9eb", cursor:"pointer",
@@ -416,7 +430,7 @@ export default function StudentDetailPage() {
         </div>
     );
 
-    /* -- Page --------------------------------------------------------------- */
+    /* ── Page ───────────────────────────────────────────────────────────── */
     return (
         <div style={{
             minHeight: "100vh",
@@ -429,7 +443,7 @@ export default function StudentDetailPage() {
                     radial-gradient(ellipse 50% 40% at 90% 80%, rgba(16,41,90,0.6) 0%, transparent 60%)
                 ` }}/>
 
-            {/* -- Top bar ------------------------------------------------- */}
+            {/* ── Top bar ─────────────────────────────────────────────── */}
             <header style={{
                 position:"sticky", top:0, zIndex:50,
                 background:"rgba(6,21,46,0.85)",
@@ -456,34 +470,13 @@ export default function StudentDetailPage() {
                         #{student.id}
                     </span>
                 </div>
-                <div style={{ display:"flex", gap:10 }}>
-                    {/*<button style={{*/}
-                    {/*    padding:"8px 20px", borderRadius:9999,*/}
-                    {/*    border:"1.5px solid rgba(255,255,255,0.15)",*/}
-                    {/*    background:"rgba(255,255,255,0.06)", color:"rgba(255,255,255,0.75)",*/}
-                    {/*    cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",*/}
-                    {/*}}*/}
-                    {/*        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.12)"; }}*/}
-                    {/*        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(255,255,255,0.06)"; }}>*/}
-                    {/*    Edit*/}
-                    {/*</button>*/}
-                    {/*<button style={{*/}
-                    {/*    padding:"8px 20px", borderRadius:9999,*/}
-                    {/*    border:"1.5px solid rgba(229,62,62,0.35)",*/}
-                    {/*    background:"rgba(229,62,62,0.12)", color:"#fc8181",*/}
-                    {/*    cursor:"pointer", fontSize:"0.78rem", fontWeight:600, letterSpacing:"0.06em",*/}
-                    {/*}}*/}
-                    {/*        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.2)"; }}*/}
-                    {/*        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="rgba(229,62,62,0.12)"; }}>*/}
-                    {/*    Delete*/}
-                    {/*</button>*/}
-                </div>
+                <div style={{ display:"flex", gap:10 }} />
             </header>
 
-            {/* -- Content ------------------------------------------------- */}
+            {/* ── Content ─────────────────────────────────────────────── */}
             <div style={{ position:"relative", zIndex:1, maxWidth:960, margin:"0 auto", padding:"32px 24px 64px" }}>
 
-                {/* -- Hero card ------------------------------------------- */}
+                {/* ── Hero card ───────────────────────────────────────── */}
                 <GlassCard style={{ marginBottom:24, overflow:"hidden" }}>
                     <div style={{
                         height:100,
@@ -578,7 +571,7 @@ export default function StudentDetailPage() {
                     </div>
                 </GlassCard>
 
-                {/* -- Two-column grid -------------------------------------- */}
+                {/* ── Two-column grid ─────────────────────────────────── */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
 
                     {/* LEFT column */}
@@ -680,11 +673,8 @@ export default function StudentDetailPage() {
                     </div>
                 </div>
 
-                {/* -- Admin Review Panel (full-width below grid) ----------- */}
-                <AdminReviewPanel
-                    student={student}
-                    onSaved={updated => setStudent(prev => prev ? { ...prev, ...updated } : updated)}
-                />
+                {/* ── Admin Review Panel (full-width below grid) ───────── */}
+                <AdminReviewPanel student={student} />
             </div>
         </div>
     );
