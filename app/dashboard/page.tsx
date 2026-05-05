@@ -3,9 +3,41 @@
 import { useState, useEffect, JSX } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
+import axios, { AxiosError } from "axios";
+import {
+    useQuery,
+    useMutation,
+    useQueryClient,
+    QueryClient,
+    QueryClientProvider,
+} from "@tanstack/react-query";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
+
+/* -- Axios instance -------------------------------------------------------- */
+const api = axios.create({ baseURL: `${BASE_URL}${API_VERSION}` });
+
+// Attach auth token on every request
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
+
+// Handle 401 globally
+api.interceptors.response.use(
+    (res) => res,
+    (error: AxiosError) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
+            localStorage.removeItem("user");
+            window.location.href = "/login";
+        }
+        return Promise.reject(error);
+    }
+);
 
 /* -- Types ----------------------------------------------------------------- */
 type Tab = "Students" | "Payments" | "Notice";
@@ -519,11 +551,29 @@ function FilterChip({ label, value, onRemove }: { label: string; value: string; 
     );
 }
 
+/* -- API fetchers ---------------------------------------------------------- */
+async function fetchPayments(params: Record<string, string>): Promise<PaymentListResponse> {
+    const { data } = await api.get<PaymentListResponse>("/payment/all-payments/", { params });
+    return data;
+}
+
+async function fetchStudents(params: Record<string, string>): Promise<StudentListResponse> {
+    const { data } = await api.get<StudentListResponse>("/student/list/", { params });
+    return data;
+}
+
+async function fetchNotices(params: Record<string, string>): Promise<NoticeListResponse> {
+    const { data } = await api.get<NoticeListResponse>("/notice/list/", { params });
+    return data;
+}
+
+async function createNotice(payload: { title: string; description: string }): Promise<Notice> {
+    const { data } = await api.post<Notice>("/notice/create/", payload);
+    return data;
+}
+
 /* -- Payments tab ---------------------------------------------------------- */
 function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
-    const [data,          setData]          = useState<PaymentListResponse | null>(null);
-    const [loading,       setLoading]       = useState(true);
-    const [error,         setError]         = useState("");
     const [page,          setPage]          = useState(1);
     const [search,        setSearch]        = useState("");
     const [statusFilter,  setStatusFilter]  = useState("");
@@ -542,35 +592,22 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
 
     const hasActiveFilters = search || statusFilter || methodFilter;
 
-    useEffect(() => {
-        setLoading(true);
-        setError("");
-        const token = localStorage.getItem("access_token");
-        const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
-        if (search)       params.set("search",         search);
-        if (statusFilter) params.set("status",         statusFilter);
-        if (methodFilter) params.set("payment_method", methodFilter);
+    const params: Record<string, string> = { page: String(page), page_size: String(PAGE_SIZE) };
+    if (search)       params.search         = search;
+    if (statusFilter) params.status         = statusFilter;
+    if (methodFilter) params.payment_method = methodFilter;
 
-        fetch(`${BASE_URL}${API_VERSION}/payment/all-payments/?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(r => {
-                if (r.status === 401) {
-                    localStorage.removeItem("access_token");
-                    localStorage.removeItem("refresh_token");
-                    localStorage.removeItem("user");
-                    window.location.href = "/login";
-                    throw new Error("Unauthorized");
-                }
-                if (!r.ok) throw new Error(`Error ${r.status}`);
-                return r.json();
-            })
-            .then((d: PaymentListResponse) => { setData(d); onCount(d.count); })
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [page, search, statusFilter, methodFilter]);
+    const { data, isLoading, isError, error } = useQuery({
+        queryKey: ["payments", page, search, statusFilter, methodFilter],
+        queryFn: () => fetchPayments(params),
+    });
+
+    useEffect(() => {
+        if (data) onCount(data.count);
+    }, [data, onCount]);
 
     const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
+    const errorMsg = isError ? (error instanceof AxiosError ? error.message : "Failed to load payments.") : "";
 
     return (
         <div className="fade-up">
@@ -580,7 +617,7 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                     Payments
                 </h2>
                 <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
-                    {loading ? "Loading…" : `${data?.count ?? 0} transaction${data?.count !== 1 ? "s" : ""}`}
+                    {isLoading ? "Loading…" : `${data?.count ?? 0} transaction${data?.count !== 1 ? "s" : ""}`}
                 </p>
             </div>
 
@@ -644,12 +681,12 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                 )}
             </div>
 
-            {error && (
+            {errorMsg && (
                 <div className="error-banner">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
-                    {error}
+                    {errorMsg}
                 </div>
             )}
 
@@ -661,7 +698,7 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                 </tr>
                 </thead>
                 <tbody>
-                {loading
+                {isLoading
                     ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
                     : !data?.results.length
                         ? <tr><td colSpan={9} style={{ textAlign: "center", padding: "48px 16px", color: theme.textMuted }}>
@@ -688,7 +725,7 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
                 </tbody>
             </TableWrap>
 
-            {!loading && totalPages > 1 && (
+            {!isLoading && totalPages > 1 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
                     <p style={{ fontSize: "0.78rem", color: theme.textMuted }}>
                         Page {page} of {totalPages} · {data?.count} total
@@ -705,11 +742,10 @@ function PaymentsTab({ onCount }: { onCount: (n: number) => void }) {
 
 /* -- Notice form ----------------------------------------------------------- */
 function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void }) {
-    const [title,      setTitle]      = useState("");
-    const [desc,       setDesc]       = useState("");
-    const [errors,     setErrors]     = useState<{ title?: string; description?: string }>({});
-    const [submitting, setSubmitting] = useState(false);
-    const [apiError,   setApiError]   = useState("");
+    const queryClient = useQueryClient();
+    const [title,  setTitle]  = useState("");
+    const [desc,   setDesc]   = useState("");
+    const [errors, setErrors] = useState<{ title?: string; description?: string }>({});
 
     const special = new Set("@_!#$%^&*()<>?/\\|}{~:");
 
@@ -721,49 +757,28 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
         return e;
     }
 
-    async function handleSubmit() {
+    const mutation = useMutation({
+        mutationFn: createNotice,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["notices"] });
+            onSave();
+        },
+        onError: (err: AxiosError<{ title?: string[]; description?: string[]; message?: string }>) => {
+            const data = err.response?.data;
+            if (data?.title)       setErrors(v => ({ ...v, title: data.title![0] }));
+            if (data?.description) setErrors(v => ({ ...v, description: data.description![0] }));
+        },
+    });
+
+    function handleSubmit() {
         const e = validate();
         if (Object.keys(e).length) { setErrors(e); return; }
-
-        setSubmitting(true);
-        setApiError("");
-
-        try {
-            const token = localStorage.getItem("access_token");
-            const res = await fetch(`${BASE_URL}${API_VERSION}/notice/create/`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ title: title.trim(), description: desc.trim() }),
-            });
-
-            if (res.status === 401) {
-                localStorage.removeItem("access_token");
-                localStorage.removeItem("refresh_token");
-                localStorage.removeItem("user");
-                window.location.href = "/login";
-                return;
-            }
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                if (data?.title)       setErrors(v => ({ ...v, title: data.title[0] }));
-                if (data?.description) setErrors(v => ({ ...v, description: data.description[0] }));
-                if (!data?.title && !data?.description)
-                    setApiError(data?.message ?? `Request failed (${res.status})`);
-                return;
-            }
-
-            onSave();
-        } catch {
-            setApiError("Network error. Please try again.");
-        } finally {
-            setSubmitting(false);
-        }
+        mutation.mutate({ title: title.trim(), description: desc.trim() });
     }
+
+    const apiError = mutation.isError && !mutation.error?.response?.data?.title && !mutation.error?.response?.data?.description
+        ? ((mutation.error as AxiosError<{ message?: string }>).response?.data?.message ?? "Network error. Please try again.")
+        : "";
 
     return (
         <div className="fade-up">
@@ -837,14 +852,14 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
                     </div>
 
                     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
-                        <button className="btn-ghost" onClick={onBack} disabled={submitting}>Cancel</button>
+                        <button className="btn-ghost" onClick={onBack} disabled={mutation.isPending}>Cancel</button>
                         <button
                             className="btn-primary"
                             onClick={handleSubmit}
-                            disabled={submitting}
-                            style={{ display: "flex", alignItems: "center", gap: 7, opacity: submitting ? 0.65 : 1 }}
+                            disabled={mutation.isPending}
+                            style={{ display: "flex", alignItems: "center", gap: 7, opacity: mutation.isPending ? 0.65 : 1 }}
                         >
-                            {submitting ? (
+                            {mutation.isPending ? (
                                 <>
                                     <svg style={{ animation: "spin 0.8s linear infinite" }} width="13" height="13"
                                          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
@@ -864,53 +879,29 @@ function NoticeForm({ onBack, onSave }: { onBack: () => void; onSave: () => void
 
 /* -- Notice tab ------------------------------------------------------------ */
 function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
-    const [view,    setView]    = useState<"list" | "create">("list");
-    const [notices, setNotices] = useState<Notice[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState("");
-    const [page,    setPage]    = useState(1);
-    const [total,   setTotal]   = useState(0);
+    const [view, setView] = useState<"list" | "create">("list");
+    const [page, setPage] = useState(1);
     const PAGE_SIZE = 10;
 
-    async function fetchNotices(p = 1) {
-        setLoading(true);
-        setError("");
-        try {
-            const token = localStorage.getItem("access_token");
-            const params = new URLSearchParams({ page: String(p), page_size: String(PAGE_SIZE) });
-            const res = await fetch(`${BASE_URL}${API_VERSION}/notice/list/?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+    const params: Record<string, string> = { page: String(page), page_size: String(PAGE_SIZE) };
 
-            if (res.status === 401) {
-                localStorage.removeItem("access_token");
-                localStorage.removeItem("refresh_token");
-                localStorage.removeItem("user");
-                window.location.href = "/login";
-                return;
-            }
+    const { data, isLoading, isError, error } = useQuery({
+        queryKey: ["notices", page],
+        queryFn: () => fetchNotices(params),
+        enabled: view === "list",
+    });
 
-            if (!res.ok) throw new Error(`Error ${res.status}`);
-            const data: NoticeListResponse = await res.json();
-            setNotices(data.results);
-            setTotal(data.count);
-            onCount(data.count);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : "Failed to load notices.");
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => { fetchNotices(page); }, [page]);
+    useEffect(() => {
+        if (data) onCount(data.count);
+    }, [data, onCount]);
 
     function handleSaved() {
         setView("list");
         setPage(1);
-        fetchNotices(1);
     }
 
-    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
+    const errorMsg = isError ? (error instanceof AxiosError ? error.message : "Failed to load notices.") : "";
 
     if (view === "create") return <NoticeForm onBack={() => setView("list")} onSave={handleSaved} />;
 
@@ -922,7 +913,7 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                         Notice Board
                     </h2>
                     <p style={{ color: theme.textMuted, fontSize: "0.78rem", marginTop: 4 }}>
-                        {loading ? "Loading…" : `${total} notice${total !== 1 ? "s" : ""} published`}
+                        {isLoading ? "Loading…" : `${data?.count ?? 0} notice${data?.count !== 1 ? "s" : ""} published`}
                     </p>
                 </div>
                 <button
@@ -938,7 +929,7 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 </button>
             </div>
 
-            {error && (
+            {errorMsg && (
                 <div className="error-banner">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          strokeWidth="2" strokeLinecap="round">
@@ -946,7 +937,7 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                         <line x1="12" y1="8" x2="12" y2="12"/>
                         <line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
-                    {error}
+                    {errorMsg}
                 </div>
             )}
 
@@ -955,13 +946,13 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 <tr>{["#", "Title", "Description", "Created", "Updated"].map(h => <th key={h}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                {loading
+                {isLoading
                     ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={5} />)
-                    : !notices.length
+                    : !data?.results.length
                         ? <tr><td colSpan={5} style={{ textAlign: "center", padding: "48px 16px", color: theme.textMuted }}>
                             No notices found.
                         </td></tr>
-                        : notices.map(n => (
+                        : data.results.map(n => (
                             <tr key={n.id}>
                                 <td style={{ color: theme.textMuted, fontSize: "0.78rem" }}>{n.id}</td>
                                 <td style={{ fontWeight: 600, color: theme.textPrimary }}>{n.title}</td>
@@ -979,10 +970,10 @@ function NoticeTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 </tbody>
             </TableWrap>
 
-            {!loading && totalPages > 1 && (
+            {!isLoading && totalPages > 1 && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
                     <p style={{ fontSize: "0.78rem", color: theme.textMuted }}>
-                        Page {page} of {totalPages} · {total} total
+                        Page {page} of {totalPages} · {data?.count} total
                     </p>
                     <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn-ghost" disabled={page === 1}          onClick={() => setPage(p => p - 1)}>← Prev</button>
@@ -1084,16 +1075,12 @@ export function DashboardSidebar({
 /* -- Students tab ---------------------------------------------------------- */
 function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
     const router = useRouter();
-    const [data,          setData]          = useState<StudentListResponse|null>(null);
-    const [loading,       setLoading]       = useState(true);
-    const [error,         setError]         = useState("");
     const [page,          setPage]          = useState(1);
     const [search,        setSearch]        = useState("");
     const [classFilter,   setClassFilter]   = useState("");
     const [statusFilter,  setStatusFilter]  = useState("");
     const PAGE_SIZE = 10;
 
-    // Adjust these to match your actual grade/class options
     const STUDENT_CLASSES  = ["1","2","3","4","5","6","7","8","9","10","11","12"];
     const STUDENT_STATUSES = ["pending", "approved", "rejected"];
 
@@ -1106,32 +1093,22 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
 
     const hasActiveFilters = search || classFilter || statusFilter;
 
-    useEffect(()=>{
-        setLoading(true); setError("");
-        const token = localStorage.getItem("access_token");
-        const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
-        if (search)       params.set("search",        search);
-        if (classFilter)  params.set("student_class", classFilter);
-        if (statusFilter) params.set("status",        statusFilter);
+    const params: Record<string, string> = { page: String(page), page_size: String(PAGE_SIZE) };
+    if (search)       params.search        = search;
+    if (classFilter)  params.student_class = classFilter;
+    if (statusFilter) params.status        = statusFilter;
 
-        fetch(`${BASE_URL}${API_VERSION}/student/list/?${params}`, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => {
-                if (r.status === 401) {
-                    localStorage.removeItem("access_token");
-                    localStorage.removeItem("refresh_token");
-                    localStorage.removeItem("user");
-                    window.location.href = "/login";
-                    throw new Error("Unauthorized");
-                }
-                if (!r.ok) throw new Error(`Error ${r.status}`);
-                return r.json();
-            })
-            .then((d: StudentListResponse) => { setData(d); onCount(d.count); })
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [page, search, classFilter, statusFilter]);
+    const { data, isLoading, isError, error } = useQuery({
+        queryKey: ["students", page, search, classFilter, statusFilter],
+        queryFn: () => fetchStudents(params),
+    });
+
+    useEffect(() => {
+        if (data) onCount(data.count);
+    }, [data, onCount]);
 
     const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1;
+    const errorMsg = isError ? (error instanceof AxiosError ? error.message : "Failed to load students.") : "";
 
     return (
         <div className="fade-up">
@@ -1203,12 +1180,12 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 )}
             </div>
 
-            {error && (
+            {errorMsg && (
                 <div className="error-banner">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                     </svg>
-                    {error}
+                    {errorMsg}
                 </div>
             )}
 
@@ -1217,7 +1194,7 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 <tr>{["#","Student","Email","Phone","Class","Year","Status","Fee","Actions"].map(h=><th key={h}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
-                {loading
+                {isLoading
                     ? Array.from({length:5}).map((_,i)=><SkeletonRow key={i} cols={9}/>)
                     : !data?.results.length
                         ? <tr><td colSpan={9} style={{textAlign:"center",padding:"48px 16px",color:theme.textMuted}}>No students found.</td></tr>
@@ -1251,7 +1228,7 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
                 </tbody>
             </TableWrap>
 
-            {!loading && data && totalPages > 1 && (
+            {!isLoading && data && totalPages > 1 && (
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:16}}>
                     <p style={{fontSize:"0.78rem",color:theme.textMuted}}>Page {page} of {totalPages} · {data.count} total</p>
                     <div style={{display:"flex",gap:8}}>
@@ -1264,8 +1241,18 @@ function StudentsTabWithCount({ onCount }: { onCount: (n:number)=>void }) {
     );
 }
 
+/* -- QueryClient singleton ------------------------------------------------- */
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            retry: 1,
+            staleTime: 30_000,
+        },
+    },
+});
+
 /* -- Main Dashboard -------------------------------------------------------- */
-export default function DashboardPage() {
+function DashboardPageInner() {
     useAuthGuard();
     const [activeTab,    setActiveTab]    = useState<Tab>("Students");
     const [sidebarOpen,  setSidebarOpen]  = useState(true);
@@ -1329,5 +1316,13 @@ export default function DashboardPage() {
                 </main>
             </div>
         </>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <QueryClientProvider client={queryClient}>
+            <DashboardPageInner />
+        </QueryClientProvider>
     );
 }
