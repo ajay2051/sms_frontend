@@ -1,11 +1,13 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
+import { useMutation } from "@tanstack/react-query";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
-/* ── Months ──────────────────────────────────────────────────────────── */
+/* ── Months ──────────────────────────────────────────────────────────────── */
 const MONTHS = [
     { value: "January",   short: "Jan", num: 1  },
     { value: "February",  short: "Feb", num: 2  },
@@ -23,7 +25,7 @@ const MONTHS = [
 
 const currentMonth = new Date().getMonth(); // 0-indexed
 
-/* ── Section card ────────────────────────────────────────────────────── */
+/* ── Section card ────────────────────────────────────────────────────────── */
 function SectionCard({ icon, title, children }: {
     icon: React.ReactNode; title: string; children: React.ReactNode;
 }) {
@@ -42,7 +44,7 @@ function SectionCard({ icon, title, children }: {
     );
 }
 
-/* ── Main ─────────────────────────────────────────────────────────────── */
+/* ── Main ────────────────────────────────────────────────────────────────── */
 export default function FeePage() {
     const router = useRouter();
 
@@ -53,6 +55,7 @@ export default function FeePage() {
     const [feeIds, setFeeIds]                 = useState<number[]>([]);
     const [apiError, setApiError]             = useState("");
 
+    /* ── Toggle month selection ─────────────────────────────────────────── */
     function toggleMonth(month: string) {
         setSelectedMonths(prev =>
             prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]
@@ -60,46 +63,44 @@ export default function FeePage() {
         setApiError("");
     }
 
-    function selectAll() {
-        setSelectedMonths(MONTHS.map(m => m.value));
-    }
-    function clearAll() {
-        setSelectedMonths([]);
-    }
+    function selectAll() { setSelectedMonths(MONTHS.map(m => m.value)); }
+    function clearAll()  { setSelectedMonths([]); }
 
-    /* Submit one POST per selected month (API takes single month per call) */
+    /* ── TanStack mutation (axios) ──────────────────────────────────────── */
+    const createFeeMutation = useMutation({
+        mutationFn: async (month: string) => {
+            const { data } = await axios.post<{ id?: number; data?: { id: number } }>(
+                `${BASE_URL}${API_VERSION}/fee/create/`,
+                { month },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+                    },
+                }
+            );
+            return (data?.id ?? data?.data?.id) as number;
+        },
+    });
+
+    /* ── Submit: fire all months in parallel ────────────────────────────── */
     async function handleSubmit() {
         if (!selectedMonths.length) return;
         setSubmitting(true);
         setApiError("");
         try {
-            const ids: number[] = [];
-            for (const month of selectedMonths) {
-                const res = await fetch(`${BASE_URL}${API_VERSION}/fee/create/`, {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ month }),
-                });
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(`${month}: ${data?.detail ?? `Error ${res.status}`}`);
-                }
-                const data = await res.json();
-                ids.push(data?.id ?? data?.data?.id);
-            }
+            const ids = await Promise.all(
+                selectedMonths.map((month) => createFeeMutation.mutateAsync(month))
+            );
             router.push(`/payment?from=fee&fee_ids=${ids.join(",")}`);
         } catch (err: any) {
-            setApiError(err.message ?? "Something went wrong");
+            const detail = err?.response?.data?.detail;
+            setApiError(detail ?? err.message ?? "Something went wrong");
         } finally {
             setSubmitting(false);
         }
     }
 
-
-    /* ── Main page ────────────────────────────────────────────────────── */
+    /* ── Render ─────────────────────────────────────────────────────────── */
     return (
         <div style={{ minHeight: "100vh", background: "var(--navy-900)", padding: "2.5rem 3rem" }}>
             <style>{`
@@ -308,8 +309,8 @@ export default function FeePage() {
                                         onClick={() => toggleMonth(month.value)}
                                         className={[
                                             "fee-month-card",
-                                            isSelected  ? "fee-month-selected"  : "",
-                                            isCurrent   ? "fee-month-current"   : "",
+                                            isSelected ? "fee-month-selected" : "",
+                                            isCurrent  ? "fee-month-current"  : "",
                                         ].join(" ")}
                                     >
                                         {/* Checkmark */}
@@ -361,7 +362,7 @@ export default function FeePage() {
                             })}
                         </div>
 
-                        {/* Current month legend */}
+                        {/* Legend */}
                         <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginTop: "1rem" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
                                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold-400)", display: "block" }} />
@@ -389,7 +390,6 @@ export default function FeePage() {
                             }
                         >
                             <div>
-                                {/* Sort selected months in calendar order */}
                                 {[...selectedMonths]
                                     .sort((a, b) => MONTHS.findIndex(m => m.value === a) - MONTHS.findIndex(m => m.value === b))
                                     .map((month, i, arr) => (
@@ -419,7 +419,7 @@ export default function FeePage() {
                                                 onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.35)")}
                                                 title="Remove"
                                             >
-                                                ×
+                                                ✕
                                             </button>
                                         </div>
                                     ))
