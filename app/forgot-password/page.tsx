@@ -1,11 +1,18 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
+import axios from "axios";
+import { useMutation } from "@tanstack/react-query";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
-/* ── Mountain SVG background (matches login page aesthetic) ─────────── */
+/* ─── API ─────────────────────────────────────────────────────────────────── */
+async function requestPasswordReset(email: string): Promise<void> {
+    await axios.post(`${BASE_URL}${API_VERSION}/auth/forgot-password/`, { email });
+}
+
+/* ── Mountain SVG background (matches login page aesthetic) ─────────────── */
 function MountainBg() {
     return (
         <svg
@@ -20,7 +27,7 @@ function MountainBg() {
     );
 }
 
-/* ── Academia logo mark ──────────────────────────────────────────────── */
+/* ── Academia logo mark ─────────────────────────────────────────────────── */
 function LogoMark({ size = 52 }: { size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 52 52" fill="none">
@@ -34,37 +41,36 @@ function LogoMark({ size = 52 }: { size?: number }) {
 }
 
 export default function ForgotPasswordPage() {
-    const [email, setEmail]       = useState("");
-    const [submitting, setSubmitting] = useState(false);
-    const [success, setSuccess]   = useState(false);
-    const [error, setError]       = useState("");
-    const [touched, setTouched]   = useState(false);
+    const [email, setEmail]     = useState("");
+    const [touched, setTouched] = useState(false);
 
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const emailValid    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const showEmailError = touched && email.length > 0 && !emailValid;
 
-    async function handleSubmit(e: React.FormEvent) {
+    /* ── TanStack mutation ─────────────────────────────────────────────── */
+    const mutation = useMutation<void, Error, string>({
+        mutationFn: requestPasswordReset,
+    });
+
+    const success    = mutation.isSuccess;
+    const submitting = mutation.isPending;
+    const error      = mutation.isError
+        ? (axios.isAxiosError(mutation.error)
+            ? (mutation.error.response?.data?.message ?? `Error ${mutation.error.response?.status}`)
+            : (mutation.error.message ?? "Something went wrong. Please try again."))
+        : "";
+
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setTouched(true);
         if (!emailValid) return;
-        setSubmitting(true);
-        setError("");
-        try {
-            const res = await fetch(`${BASE_URL}${API_VERSION}/auth/forgot-password/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(data?.message ?? `Error ${res.status}`);
-            }
-            setSuccess(true);
-        } catch (err: any) {
-            setError(err.message ?? "Something went wrong. Please try again.");
-        } finally {
-            setSubmitting(false);
-        }
+        mutation.mutate(email);
+    }
+
+    function handleReset() {
+        mutation.reset();
+        setEmail("");
+        setTouched(false);
     }
 
     return (
@@ -178,7 +184,7 @@ export default function ForgotPasswordPage() {
                 }
             `}</style>
 
-            {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
+            {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
             <div className="fp-left-panel" style={{
                 position: "relative",
                 background: "linear-gradient(160deg, var(--navy-800) 0%, var(--navy-950) 100%)",
@@ -261,7 +267,7 @@ export default function ForgotPasswordPage() {
                 </div>
             </div>
 
-            {/* ── RIGHT PANEL ────────────────────────────────────────────────── */}
+            {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
             <div className="fp-right-panel" style={{
                 background: "var(--navy-900)",
                 display: "flex",
@@ -358,14 +364,14 @@ export default function ForgotPasswordPage() {
                                     "You can only use the link once.",
                                 ].map((tip, i) => (
                                     <div key={i} style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginBottom: i < 2 ? "0.5rem" : 0 }}>
-                                        <span style={{ color: "var(--sky-400)", fontSize: "0.75rem", marginTop: 2, flexShrink: 0 }}>•</span>
+                                        <span style={{ color: "var(--sky-400)", fontSize: "0.75rem", marginTop: 2, flexShrink: 0 }}>✦</span>
                                         <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>{tip}</span>
                                     </div>
                                 ))}
                             </div>
 
                             <button
-                                onClick={() => { setSuccess(false); setEmail(""); setTouched(false); }}
+                                onClick={handleReset}
                                 style={{
                                     width: "100%", padding: "0.75rem",
                                     borderRadius: 10,
@@ -428,7 +434,7 @@ export default function ForgotPasswordPage() {
                                             style={{ paddingLeft: "2.5rem" }}
                                             placeholder="you@example.com"
                                             value={email}
-                                            onChange={e => { setEmail(e.target.value); setError(""); }}
+                                            onChange={e => { setEmail(e.target.value); mutation.reset(); }}
                                             onBlur={() => setTouched(true)}
                                             autoComplete="email"
                                             required
