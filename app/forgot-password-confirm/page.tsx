@@ -1,12 +1,32 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import {useSearchParams} from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
 
-/* ── Mountain SVG background ─────────────────────────────────────────── */
+/* ── API ─────────────────────────────────────────────────────────────────── */
+interface ResetPasswordPayload {
+    new_password: string;
+    confirm_new_password: string;
+}
+
+async function resetPassword(
+    user_id: string,
+    token: string,
+    payload: ResetPasswordPayload
+) {
+    const { data } = await axios.patch(
+        `${BASE_URL}${API_VERSION}/auth/forgot-password-confirm/${user_id}/${token}/`,
+        payload
+    );
+    return data;
+}
+
+/* ── Mountain SVG background ─────────────────────────────────────────────── */
 function MountainBg() {
     return (
         <svg
@@ -21,7 +41,7 @@ function MountainBg() {
     );
 }
 
-/* ── Logo mark ───────────────────────────────────────────────────────── */
+/* ── Logo mark ───────────────────────────────────────────────────────────── */
 function LogoMark({ size = 52 }: { size?: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 52 52" fill="none">
@@ -34,7 +54,7 @@ function LogoMark({ size = 52 }: { size?: number }) {
     );
 }
 
-/* ── Password strength ───────────────────────────────────────────────── */
+/* ── Password strength ───────────────────────────────────────────────────── */
 function getStrength(pw: string): { score: number; label: string; color: string } {
     if (!pw) return { score: 0, label: "", color: "transparent" };
     let score = 0;
@@ -43,12 +63,12 @@ function getStrength(pw: string): { score: number; label: string; color: string 
     if (/[A-Z]/.test(pw)) score++;
     if (/[0-9]/.test(pw)) score++;
     if (/[^A-Za-z0-9]/.test(pw)) score++;
-    if (score <= 1) return { score, label: "Weak",   color: "var(--danger)"  };
-    if (score <= 3) return { score, label: "Fair",   color: "var(--gold-400)"};
-    return              { score, label: "Strong", color: "#4ade80"          };
+    if (score <= 1) return { score, label: "Weak",   color: "var(--danger)"   };
+    if (score <= 3) return { score, label: "Fair",   color: "var(--gold-400)" };
+    return              { score, label: "Strong", color: "#4ade80"           };
 }
 
-/* ── Eye toggle icon ─────────────────────────────────────────────────── */
+/* ── Eye toggle icon ─────────────────────────────────────────────────────── */
 function EyeIcon({ open }: { open: boolean }) {
     return open ? (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,13 +82,12 @@ function EyeIcon({ open }: { open: boolean }) {
     );
 }
 
-/* ── Main ─────────────────────────────────────────────────────────────── */
+/* ── Main ────────────────────────────────────────────────────────────────── */
 export default function ForgotPasswordConfirmPage({
                                                       params,
                                                   }: {
     params: { user_id: string; token: string };
 }) {
-    // const { user_id, token } = params;
     const searchParams = useSearchParams();
     const user_id = searchParams.get("user_id");
     const token   = searchParams.get("token");
@@ -77,42 +96,33 @@ export default function ForgotPasswordConfirmPage({
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showNew,         setShowNew]         = useState(false);
     const [showConfirm,     setShowConfirm]     = useState(false);
-    const [submitting,      setSubmitting]      = useState(false);
-    const [success,         setSuccess]         = useState(false);
-    const [error,           setError]           = useState("");
     const [touched,         setTouched]         = useState({ new: false, confirm: false });
+
+    const mutation = useMutation({
+        mutationFn: (payload: ResetPasswordPayload) =>
+            resetPassword(user_id!, token!, payload),
+    });
+
+    const submitting = mutation.isPending;
+    const success    = mutation.isSuccess;
+    const error      = mutation.isError
+        ? ((mutation.error as AxiosError<{ message?: string }>)
+            .response?.data?.message ?? "Something went wrong. Please try again.")
+        : "";
 
     const strength       = getStrength(newPassword);
     const passwordsMatch = newPassword === confirmPassword;
     const newError       = touched.new     && newPassword.length > 0     && newPassword.length < 8;
     const confirmError   = touched.confirm && confirmPassword.length > 0 && !passwordsMatch;
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setTouched({ new: true, confirm: true });
         if (newPassword.length < 8 || !passwordsMatch) return;
-        setSubmitting(true);
-        setError("");
-        try {
-            const res = await fetch(
-                `${BASE_URL}${API_VERSION}/auth/forgot-password-confirm/${user_id}/${token}/`,
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        new_password:     newPassword,
-                        confirm_new_password: confirmPassword,
-                    }),
-                }
-            );
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.message ?? `Error ${res.status}`);
-            setSuccess(true);
-        } catch (err: any) {
-            setError(err.message ?? "Something went wrong. Please try again.");
-        } finally {
-            setSubmitting(false);
-        }
+        mutation.mutate({
+            new_password:         newPassword,
+            confirm_new_password: confirmPassword,
+        });
     }
 
     return (
@@ -252,7 +262,7 @@ export default function ForgotPasswordConfirmPage({
                 }
             `}</style>
 
-            {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
+            {/* LEFT PANEL */}
             <div className="fpc-left" style={{
                 position: "relative",
                 background: "linear-gradient(160deg, var(--navy-800) 0%, var(--navy-950) 100%)",
@@ -333,7 +343,7 @@ export default function ForgotPasswordConfirmPage({
                 </div>
             </div>
 
-            {/* ── RIGHT PANEL ────────────────────────────────────────────────── */}
+            {/* RIGHT PANEL */}
             <div className="fpc-right" style={{
                 background: "var(--navy-900)",
                 display: "flex",
@@ -373,7 +383,7 @@ export default function ForgotPasswordConfirmPage({
                     padding: "2.25rem 2rem",
                 }}>
                     {success ? (
-                        /* ── Success state ── */
+                        /* Success state */
                         <div className="fpc-fade-up" style={{ textAlign: "center" }}>
                             <div style={{ position: "relative", display: "inline-block", marginBottom: "1.5rem" }}>
                                 <div className="pulse-ring" style={{
@@ -440,7 +450,7 @@ export default function ForgotPasswordConfirmPage({
                             </Link>
                         </div>
                     ) : (
-                        /* ── Form state ── */
+                        /* Form state */
                         <>
                             <div className="fpc-fade-up" style={{ marginBottom: "1.75rem" }}>
                                 <h3 style={{
@@ -457,7 +467,7 @@ export default function ForgotPasswordConfirmPage({
 
                             <form onSubmit={handleSubmit} noValidate>
 
-                                {/* ── New password ── */}
+                                {/* New password */}
                                 <div className="fpc-fade-up fpc-d1" style={{ marginBottom: "1.25rem" }}>
                                     <label style={{
                                         display: "block",
@@ -479,7 +489,7 @@ export default function ForgotPasswordConfirmPage({
                                             }`}
                                             placeholder="Enter new password"
                                             value={newPassword}
-                                            onChange={e => { setNewPassword(e.target.value); setError(""); }}
+                                            onChange={e => { setNewPassword(e.target.value); mutation.reset(); }}
                                             onBlur={() => setTouched(t => ({ ...t, new: true }))}
                                             autoComplete="new-password"
                                         />
@@ -539,7 +549,7 @@ export default function ForgotPasswordConfirmPage({
                                     )}
                                 </div>
 
-                                {/* ── Confirm password ── */}
+                                {/* Confirm password */}
                                 <div className="fpc-fade-up fpc-d2" style={{ marginBottom: "1.5rem" }}>
                                     <label style={{
                                         display: "block",
@@ -561,7 +571,7 @@ export default function ForgotPasswordConfirmPage({
                                             }`}
                                             placeholder="Repeat new password"
                                             value={confirmPassword}
-                                            onChange={e => { setConfirmPassword(e.target.value); setError(""); }}
+                                            onChange={e => { setConfirmPassword(e.target.value); mutation.reset(); }}
                                             onBlur={() => setTouched(t => ({ ...t, confirm: true }))}
                                             autoComplete="new-password"
                                         />
