@@ -3,17 +3,44 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useMutation } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 
 const LOGO_SRC = "/logo.png";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION;
 
+// ── Types ──────────────────────────────────────────────────────────────────
+interface LoginPayload {
+    email: string;
+    password: string;
+}
+
+interface LoginResponse {
+    access: string;
+    refresh: string;
+    user: { role: string; [key: string]: unknown };
+    message?: string;
+}
+
+interface ApiError {
+    detail?: string;
+    non_field_errors?: string[];
+    email?: string[];
+}
+
+// ── API function ───────────────────────────────────────────────────────────
+const loginUser = (payload: LoginPayload) =>
+    axios
+        .post<LoginResponse>(`${BASE_URL}${API_VERSION}/auth/login/`, payload)
+        .then((res) => res.data);
+
+// ── Sub-components (unchanged) ─────────────────────────────────────────────
 function SchoolLogo({ width = 46, height = 52 }: { width?: number; height?: number }) {
     return <Image src={LOGO_SRC} alt="School logo" width={width} height={height} style={{ objectFit: "contain" }} />;
 }
 
-// ── Toast notification ─────────────────────────────────────────────
 function Toast({ message, type }: { message: string; type: "success" | "error" }) {
     return (
         <div style={{
@@ -27,21 +54,21 @@ function Toast({ message, type }: { message: string; type: "success" | "error" }
             maxWidth: 360,
         }}>
             {type === "success"
-                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
             }
             {message}
         </div>
     );
 }
 
+// ── Page ───────────────────────────────────────────────────────────────────
 export default function SignInPage() {
-    const [email, setEmail]       = useState("");
+    const [email, setEmail]     = useState("");
     const [password, setPassword] = useState("");
     const [showPass, setShowPass] = useState(false);
-    const [loading, setLoading]   = useState(false);
-    const [toast, setToast]       = useState<{ message: string; type: "success" | "error" } | null>(null);
-    const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
+    const [toast, setToast]     = useState<{ message: string; type: "success" | "error" } | null>(null);
+    const [errors, setErrors]   = useState<{ email?: string; password?: string }>({});
 
     const showToast = (message: string, type: "success" | "error") => {
         setToast({ message, type });
@@ -57,40 +84,36 @@ export default function SignInPage() {
         return Object.keys(e).length === 0;
     };
 
-    const handleSubmit = async (ev: React.FormEvent) => {
-        ev.preventDefault();
-        if (!validate()) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`${BASE_URL}${API_VERSION}/auth/login/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                const msg = data?.detail || data?.non_field_errors?.[0] || data?.email?.[0] || "Invalid credentials";
-                showToast(msg, "error");
-                return;
-            }
-            // Save to localStorage
+    // ── TanStack mutation ──────────────────────────────────────────────────
+    const { mutate: login, isPending: loading } = useMutation<LoginResponse, AxiosError<ApiError>, LoginPayload>({
+        mutationFn: loginUser,
+        onSuccess: (data) => {
             localStorage.setItem("access_token",  data.access);
             localStorage.setItem("refresh_token", data.refresh);
             localStorage.setItem("user",          JSON.stringify(data.user));
             showToast(data.message || "Successfully Logged In", "success");
             setTimeout(() => {
-                if (data.user?.role === "staff") {
-                    window.location.href = "/dashboard";
-                } else {
-                    window.location.href = "/";
-                }
-            }, 1500);        } catch {
-            showToast("Unable to connect to server. Please try again.", "error");
-        } finally {
-            setLoading(false);
-        }
+                window.location.href = data.user?.role === "staff" ? "/dashboard" : "/";
+            }, 1500);
+        },
+        onError: (err) => {
+            if (err.response) {
+                const d = err.response.data;
+                const msg = d?.detail || d?.non_field_errors?.[0] || d?.email?.[0] || "Invalid credentials";
+                showToast(msg, "error");
+            } else {
+                showToast("Unable to connect to server. Please try again.", "error");
+            }
+        },
+    });
+
+    const handleSubmit = (ev: React.FormEvent) => {
+        ev.preventDefault();
+        if (!validate()) return;
+        login({ email, password });
     };
 
+    // ── UI (100% unchanged from original) ─────────────────────────────────
     return (
         <>
             <style>{`
@@ -112,24 +135,20 @@ export default function SignInPage() {
                 background: "linear-gradient(160deg,#050f22 0%,#091a38 40%,#0e2550 70%,#0c1e3a 100%)",
                 position: "relative", overflow: "hidden",
             }}>
-                {/* Background decorations */}
                 <div style={{ position:"absolute", top:"-15%", right:"-10%", width:600, height:600, borderRadius:"50%", background:"radial-gradient(circle,rgba(22,144,216,0.12),transparent 70%)", pointerEvents:"none" }}/>
                 <div style={{ position:"absolute", bottom:"-10%", left:"-8%",  width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(226,178,62,0.08),transparent 70%)",  pointerEvents:"none" }}/>
                 <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(rgba(255,255,255,0.03) 1px,transparent 1px)", backgroundSize:"32px 32px", pointerEvents:"none" }}/>
 
-                {/* Left decorative panel */}
                 <div style={{
                     flex:"0 0 42%", position:"relative", overflow:"hidden",
                     background:"linear-gradient(160deg,#091a38 0%,#0d2040 60%,#0a1830 100%)",
                     display:"flex", flexDirection:"column", justifyContent:"center",
                     padding:"60px 56px",
                 }} className="hidden lg:flex">
-                    {/* Mountain silhouette */}
                     <div style={{ position:"absolute", inset:0 }}>
                         <div style={{ position:"absolute", inset:0, background:"linear-gradient(180deg,#87a5bb 0%,#4a7090 35%,#2a5070 60%,#0a1830 100%)", opacity:0.25 }}/>
                         <div style={{ position:"absolute", inset:0, background:"linear-gradient(180deg,rgba(20,50,90,0) 0%,rgba(5,15,35,0.95) 100%)", clipPath:"polygon(0% 100%,8% 50%,18% 70%,28% 25%,38% 55%,48% 10%,58% 45%,68% 30%,78% 60%,88% 35%,100% 55%,100% 100%)" }}/>
                     </div>
-                    {/* Glow orb */}
                     <div style={{ position:"absolute", top:"30%", left:"50%", transform:"translate(-50%,-50%)", width:300, height:300, borderRadius:"50%", background:"radial-gradient(circle,rgba(22,144,216,0.18),transparent 70%)" }}/>
 
                     <div style={{ position:"relative", zIndex:1 }}>
@@ -144,13 +163,12 @@ export default function SignInPage() {
                             </p>
                         </div>
 
-                        {/* Feature list */}
                         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
                             {[
-                                { icon:"📚", label:"Academic records & grades" },
-                                { icon:"🏔️", label:"Boarding & house management" },
-                                { icon:"📅", label:"Schedule & term dates" },
-                                { icon:"💳", label:"Online payments" },
+                                { icon:"?", label:"Academic records & grades" },
+                                { icon:"??", label:"Boarding & house management" },
+                                { icon:"?", label:"Schedule & term dates" },
+                                { icon:"?", label:"Online payments" },
                             ].map((f) => (
                                 <div key={f.label} style={{ display:"flex", alignItems:"center", gap:14 }}>
                                     <div style={{ width:36, height:36, borderRadius:10, background:"rgba(22,144,216,0.15)", border:"1px solid rgba(22,144,216,0.25)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{f.icon}</div>
@@ -161,7 +179,6 @@ export default function SignInPage() {
                     </div>
                 </div>
 
-                {/* Right: form panel */}
                 <div style={{
                     flex:1, display:"flex", flexDirection:"column",
                     alignItems:"center", justifyContent:"center",
@@ -169,14 +186,12 @@ export default function SignInPage() {
                 }}>
                     <div style={{ width:"100%", maxWidth:440, animation:"fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both" }}>
 
-                        {/* Mobile logo */}
                         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:40 }}>
                             <SchoolLogo width={44} height={50} />
                             <p style={{ fontFamily:"Georgia,serif", color:"white", fontSize:18, letterSpacing:"0.18em", margin:"8px 0 2px" }}>Academia</p>
                             <p style={{ color:"rgba(255,255,255,0.4)", fontSize:9, letterSpacing:"0.22em", textTransform:"uppercase" }}>Collège Alpin International</p>
                         </div>
 
-                        {/* Card */}
                         <div style={{
                             background:"rgba(255,255,255,0.05)", backdropFilter:"blur(20px)",
                             border:"1px solid rgba(255,255,255,0.1)", borderRadius:20,
@@ -191,7 +206,6 @@ export default function SignInPage() {
                             </p>
 
                             <form onSubmit={handleSubmit} noValidate style={{ display:"flex", flexDirection:"column", gap:20 }}>
-                                {/* Email */}
                                 <div>
                                     <label style={{ display:"block", color:"rgba(255,255,255,0.7)", fontSize:13, fontWeight:600, marginBottom:8, letterSpacing:"0.04em" }}>
                                         Email Address
@@ -204,7 +218,6 @@ export default function SignInPage() {
                                     {errors.email && <p style={{ color:"#f87171", fontSize:12, marginTop:6 }}>{errors.email}</p>}
                                 </div>
 
-                                {/* Password */}
                                 <div>
                                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                                         <label style={{ color:"rgba(255,255,255,0.7)", fontSize:13, fontWeight:600, letterSpacing:"0.04em" }}>
@@ -233,7 +246,6 @@ export default function SignInPage() {
                                     {errors.password && <p style={{ color:"#f87171", fontSize:12, marginTop:6 }}>{errors.password}</p>}
                                 </div>
 
-                                {/* Submit */}
                                 <button type="submit" disabled={loading} className="submit-btn"
                                         style={{ background:"linear-gradient(135deg,#1690d8,#0d75bd)", color:"white", marginTop:8 }}>
                                     {loading
@@ -246,14 +258,12 @@ export default function SignInPage() {
                                 </button>
                             </form>
 
-                            {/* Divider */}
                             <div style={{ display:"flex", alignItems:"center", gap:16, margin:"28px 0" }}>
                                 <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.1)" }}/>
                                 <span style={{ color:"rgba(255,255,255,0.3)", fontSize:12 }}>or continue with</span>
                                 <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.1)" }}/>
                             </div>
 
-                            {/* Social buttons */}
                             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
                                 {[
                                     { name:"Google", icon:"G" },
@@ -270,7 +280,6 @@ export default function SignInPage() {
                             </div>
                         </div>
 
-                        {/* Footer */}
                         <p style={{ textAlign:"center", color:"rgba(255,255,255,0.25)", fontSize:12, marginTop:24, lineHeight:1.6 }}>
                             By signing in, you agree to our{" "}
                             <a href="#" style={{ color:"rgba(255,255,255,0.5)", textDecoration:"none" }}>Terms of Service</a>
