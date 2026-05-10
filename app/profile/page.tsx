@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import axios, { AxiosError } from "axios";
 
 const BASE_URL    = process.env.NEXT_PUBLIC_BASE_URL    ?? "";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION ?? "/api/v1";
@@ -25,6 +27,31 @@ interface StudentProfile {
     certificates:         string[];
     created_at:           string;
     updated_at:           string;
+}
+
+/* ── Axios instance ─────────────────────────────────────────────────────── */
+const api = axios.create({ baseURL: `${BASE_URL}${API_VERSION}` });
+
+// Attach Bearer token on every request
+api.interceptors.request.use(config => {
+    const token = localStorage.getItem("access_token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
+
+/* ── API functions ──────────────────────────────────────────────────────── */
+async function fetchProfile(): Promise<StudentProfile> {
+    const { data } = await api.get<{ data?: StudentProfile } & StudentProfile>("/student/profile/");
+    return (data as any)?.data ?? data;
+}
+
+async function updateProfile(payload: { id: number; body: FormData }): Promise<StudentProfile> {
+    const { data } = await api.patch<{ data?: StudentProfile } & StudentProfile>(
+        `/student/update/${payload.id}/`,
+        payload.body,
+        { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return (data as any)?.data ?? data;
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -132,11 +159,8 @@ function Spinner() {
 /* ── Main page ──────────────────────────────────────────────────────────── */
 export default function EditProfilePage() {
     const router = useRouter();
+    const queryClient = useQueryClient();
 
-    const [profile,  setProfile]  = useState<StudentProfile | null>(null);
-    const [loading,  setLoading]  = useState(true);
-    const [saving,   setSaving]   = useState(false);
-    const [error,    setError]    = useState("");
     const [toast,    setToast]    = useState<{ type:"success"|"error"; msg:string } | null>(null);
     const [errors,   setErrors]   = useState<Record<string, string>>({});
 
@@ -163,33 +187,75 @@ export default function EditProfilePage() {
         parents_phone_number: "",
     });
 
-    /* Fetch profile on mount */
-    useEffect(() => {
-        const token = localStorage.getItem("access_token");
-        if (!token) { router.push("/login"); return; }
+    /* ── TanStack Query: fetch profile ──────────────────────────────────── */
+    const {
+        data: profile,
+        isLoading: loading,
+        error: fetchError,
+    } = useQuery<StudentProfile, AxiosError>({
+        queryKey: ["studentProfile"],
+        queryFn: async () => {
+            const token = localStorage.getItem("access_token");
+            if (!token) { router.push("/login"); throw new Error("No token"); }
+            return fetchProfile();
+        },
+        // Populate form once data arrives
+        onSuccess: (d: StudentProfile) => {
+            setForm({
+                full_name:            d.full_name,
+                phone_number:         d.phone_number,
+                student_class:        d.student_class,
+                year:                 String(d.year),
+                address:              d.address,
+                parents_name:         d.parents_name,
+                relation:             d.relation ?? "",
+                parents_phone_number: d.parents_phone_number,
+            });
+        },
+    } as any);
 
-        fetch(`${BASE_URL}${API_VERSION}/student/profile/`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(r => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json(); })
-            .then(json => {
-                const d: StudentProfile = json?.data ?? json;
-                setProfile(d);
-                setForm({
-                    full_name:            d.full_name,
-                    phone_number:         d.phone_number,
-                    student_class:        d.student_class,
-                    year:                 String(d.year),
-                    address:              d.address,
-                    parents_name:         d.parents_name,
-                    relation:             d.relation ?? "",
-                    parents_phone_number: d.parents_phone_number,
-                });
-            })
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, []);
+    /* ── TanStack Mutation: update profile ──────────────────────────────── */
+    const mutation = useMutation<StudentProfile, AxiosError, { id: number; body: FormData }>({
+        mutationFn: updateProfile,
+        onSuccess: (updated) => {
+            queryClient.setQueryData(["studentProfile"], updated);
+            setToast({ type: "success", msg: "Profile updated successfully!" });
+            setPicFile(null);
+            setPicPreview(null);
+            setCertFiles([]);
+            setRemovedCerts([]);
+            setTimeout(() => setToast(null), 5000);
+        },
+        onError: (err) => {
+            const responseData = (err.response?.data ?? {}) as Record<string, unknown>;
+            const fieldErrors: Record<string, string> = {};
+            let hasFieldErrors = false;
 
+            for (const key of Object.keys(responseData)) {
+                if (key in form) {
+                    const val = responseData[key];
+                    fieldErrors[key] = Array.isArray(val) ? String(val[0]) : String(val);
+                    hasFieldErrors = true;
+                }
+            }
+
+            if (hasFieldErrors) {
+                setErrors(fieldErrors);
+                setToast({ type: "error", msg: "Please fix the highlighted fields." });
+            } else {
+                const msg =
+                    (responseData?.message as string) ??
+                    (responseData?.detail as string) ??
+                    `Error ${err.response?.status ?? "unknown"}`;
+                setToast({ type: "error", msg });
+            }
+            setTimeout(() => setToast(null), 5000);
+        },
+    });
+
+    const saving = mutation.isPending;
+
+    /* ── Handlers ───────────────────────────────────────────────────────── */
     function handleChange(name: string, val: string) {
         setForm(prev => ({ ...prev, [name]: val }));
         setErrors(prev => ({ ...prev, [name]: "" }));
@@ -231,72 +297,27 @@ export default function EditProfilePage() {
         setRemovedCerts(prev => [...prev, url]);
     }
 
-    async function handleSubmit() {
+    function handleSubmit() {
         if (!validate() || !profile) return;
-        setSaving(true);
-        setToast(null);
 
-        try {
-            const token = localStorage.getItem("access_token");
-            const body  = new FormData();
+        const body = new FormData();
 
-            // Append editable text fields
-            (Object.keys(form) as (keyof typeof form)[]).forEach(k => body.append(k, form[k]));
+        // Append editable text fields
+        (Object.keys(form) as (keyof typeof form)[]).forEach(k => body.append(k, form[k]));
 
-            // Profile pic
-            if (picFile) body.append("profile_pic", picFile);
+        // Profile pic
+        if (picFile) body.append("profile_pic", picFile);
 
-            // New certificates (only if user added new ones)
-            if (certFiles.length > 0) {
-                certFiles.forEach(f => body.append("certificates", f));
-                removedCerts.forEach(url => body.append("remove_certificates", url));
-            }
-
-            const res = await fetch(`${BASE_URL}${API_VERSION}/student/update/${profile.id}/`, {
-                method:  "PATCH",
-                headers: { Authorization: `Bearer ${token}` },
-                body,
-            });
-            const json = await res.json();
-            if (!res.ok) {
-                // json might be { full_name: ["Full name must not contain..."], ... }
-                // or { message: "..." }
-                const fieldErrors: Record<string, string> = {};
-                let hasFieldErrors = false;
-
-                for (const key of Object.keys(json)) {
-                    if (key in form) {
-                        const val = json[key];
-                        fieldErrors[key] = Array.isArray(val) ? val[0] : String(val);
-                        hasFieldErrors = true;
-                    }
-                }
-
-                if (hasFieldErrors) {
-                    setErrors(fieldErrors);
-                    setToast({ type: "error", msg: "Please fix the highlighted fields." });
-                    return;            // skip the success path
-                }
-
-                throw new Error(json?.message ?? json?.detail ?? `Error ${res.status}`);}
-
-            setToast({ type:"success", msg:"Profile updated successfully!" });
-            // Refresh profile data
-            const updated: StudentProfile = json?.data ?? json;
-            setProfile(updated);
-            setPicFile(null);
-            setPicPreview(null);
-            setCertFiles([]);
-            setRemovedCerts([]);
-        } catch (e: any) {
-            setToast({ type:"error", msg: e.message ?? "Something went wrong." });
-        } finally {
-            setSaving(false);
-            setTimeout(() => setToast(null), 5000);
+        // New certificates
+        if (certFiles.length > 0) {
+            certFiles.forEach(f => body.append("certificates", f));
+            removedCerts.forEach(url => body.append("remove_certificates", url));
         }
+
+        mutation.mutate({ id: profile.id, body });
     }
 
-    /* ── Loading state ───────────────────────────────────────────────── */
+    /* ── Loading state ──────────────────────────────────────────────────── */
     if (loading) return (
         <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"linear-gradient(135deg,#06152e 0%,#0c2044 55%,#10295a 100%)" }}>
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
@@ -309,10 +330,14 @@ export default function EditProfilePage() {
         </div>
     );
 
-    /* ── Error state ─────────────────────────────────────────────────── */
-    if (error || !profile) return (
+    /* ── Error state ────────────────────────────────────────────────────── */
+    const errorMsg = fetchError
+        ? ((fetchError.response?.data as any)?.message ?? fetchError.message)
+        : null;
+
+    if (errorMsg || !profile) return (
         <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:16, background:"linear-gradient(135deg,#06152e 0%,#0c2044 55%,#10295a 100%)" }}>
-            <p style={{ color:"#f87171" }}>{error || "Could not load profile."}</p>
+            <p style={{ color:"#f87171" }}>{errorMsg || "Could not load profile."}</p>
             <button onClick={() => router.push("/")} style={{ padding:"10px 28px", borderRadius:999, border:"1.5px solid rgba(22,144,216,0.5)", background:"rgba(22,144,216,0.15)", color:"#38a9eb", cursor:"pointer" }}>Go Home</button>
         </div>
     );
@@ -331,7 +356,7 @@ export default function EditProfilePage() {
             {/* Glow layers */}
             <div style={{ position:"fixed", inset:0, pointerEvents:"none", zIndex:0, backgroundImage:"radial-gradient(ellipse 60% 50% at 10% 20%,rgba(22,144,216,0.07) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 90% 80%,rgba(16,41,90,0.5) 0%,transparent 60%)" }} />
 
-            {/* ── Header ───────────────────────────────────────────── */}
+            {/* ── Header ──────────────────────────────────────────────── */}
             <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(6,21,46,0.88)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"0 32px", height:64, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <button onClick={() => router.push("/")}
@@ -357,10 +382,10 @@ export default function EditProfilePage() {
                 </button>
             </header>
 
-            {/* ── Content ──────────────────────────────────────────── */}
+            {/* ── Content ─────────────────────────────────────────────── */}
             <div style={{ position:"relative", zIndex:1, maxWidth:960, margin:"0 auto", padding:"32px 24px 80px", animation:"fadeUp 0.3s ease" }}>
 
-                {/* ── Admin comment banner (if any) ─────────────────── */}
+                {/* ── Admin comment banner (if any) ────────────────────── */}
                 {profile.comments && (
                     <div style={{ marginBottom:24, padding:"16px 20px", borderRadius:12, background:"rgba(240,168,50,0.08)", border:"1px solid rgba(240,168,50,0.3)", display:"flex", gap:14, alignItems:"flex-start" }}>
                         <div style={{ flexShrink:0, width:36, height:36, borderRadius:"50%", background:"rgba(240,168,50,0.15)", border:"1px solid rgba(240,168,50,0.3)", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -375,7 +400,7 @@ export default function EditProfilePage() {
                     </div>
                 )}
 
-                {/* ── Hero card (profile pic + status) ─────────────── */}
+                {/* ── Hero card (profile pic + status) ────────────────── */}
                 <GlassCard style={{ marginBottom:24, overflow:"hidden" }}>
                     {/* Banner */}
                     <div style={{ height:90, background:"linear-gradient(135deg,#0e4a7a 0%,#163470 50%,#1b3f86 100%)", position:"relative", overflow:"hidden" }}>
@@ -437,7 +462,7 @@ export default function EditProfilePage() {
                     </div>
                 )}
 
-                {/* ── Two-column grid ───────────────────────────────────── */}
+                {/* ── Two-column grid ──────────────────────────────────── */}
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
 
                     {/* LEFT: Student info */}
@@ -497,31 +522,27 @@ export default function EditProfilePage() {
                             <div style={{ padding:"14px 20px", display:"flex", flexDirection:"column", gap:10 }}>
                                 {/* Existing certs (read-only) */}
                                 {profile.certificates
-                                    .filter(url => !removedCerts.includes(url))   // hide removed ones
+                                    .filter(url => !removedCerts.includes(url))
                                     .map((url, i) => {
                                         const name = decodeURIComponent(url.split("/").pop() ?? `File ${i+1}`);
                                         const isPdf = url.toLowerCase().endsWith(".pdf");
                                         return (
                                             <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", borderRadius:10, background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)" }}>
-                                                {/* thumb */}
                                                 <div style={{ width:36, height:36, borderRadius:8, flexShrink:0, overflow:"hidden", background:isPdf?"rgba(229,62,62,0.12)":"rgba(22,144,216,0.1)", display:"flex", alignItems:"center", justifyContent:"center", border:"1px solid rgba(255,255,255,0.08)" }}>
                                                     {isPdf
                                                         ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fc8181" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                         : <img src={url} alt={name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
                                                     }
                                                 </div>
-                                                {/* name */}
                                                 <div style={{ flex:1, minWidth:0 }}>
                                                     <p style={{ margin:0, color:"rgba(255,255,255,0.75)", fontSize:"0.78rem", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}</p>
                                                     <p style={{ margin:"2px 0 0", color:"rgba(255,255,255,0.3)", fontSize:"0.68rem" }}>Existing file</p>
                                                 </div>
-                                                {/* open link */}
                                                 <a href={url} target="_blank" rel="noopener noreferrer" style={{ color:"rgba(255,255,255,0.3)", display:"flex", flexShrink:0 }}>
                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                                                     </svg>
                                                 </a>
-                                                {/* ← NEW: remove button */}
                                                 <button
                                                     onClick={() => removeExistingCert(url)}
                                                     style={{ color:"rgba(248,113,113,0.6)", background:"none", border:"none", cursor:"pointer", padding:4, display:"flex", flexShrink:0 }}
@@ -566,7 +587,7 @@ export default function EditProfilePage() {
                     </div>
                 </div>
 
-                {/* ── Bottom save bar ───────────────────────────────────── */}
+                {/* ── Bottom save bar ──────────────────────────────────── */}
                 <div style={{ display:"flex", justifyContent:"flex-end", alignItems:"center", gap:12, marginTop:24 }}>
                     <button onClick={() => router.push("/")}
                             style={{ padding:"11px 28px", borderRadius:999, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.05)", color:"rgba(255,255,255,0.55)", fontFamily:"inherit", fontSize:"0.8rem", fontWeight:600, cursor:"pointer", transition:"all 0.15s", letterSpacing:"0.04em" }}
