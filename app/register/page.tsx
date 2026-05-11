@@ -3,11 +3,42 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import axios, { AxiosError } from "axios";
+import { useMutation } from "@tanstack/react-query";
 
 const LOGO_SRC = "/logo.png";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION;
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type Role = "student" | "teacher" | "staff";
+
+interface RegisterPayload {
+    email: string;
+    password: string;
+    role: Role;
+}
+
+interface RegisterResponse {
+    // extend as needed based on your actual API response shape
+    detail?: string;
+    email?: string[];
+    password?: string[];
+}
+
+// ─── API function ─────────────────────────────────────────────────────────────
+
+async function registerUser(payload: RegisterPayload): Promise<RegisterResponse> {
+    const { data } = await axios.post<RegisterResponse>(
+        `${BASE_URL}${API_VERSION}/auth/create_users/`,
+        payload,
+    );
+    return data;
+}
+
+// ─── Sub-components (unchanged) ───────────────────────────────────────────────
 
 function SchoolLogo({ width = 46, height = 52 }: { width?: number; height?: number }) {
     return <Image src={LOGO_SRC} alt="School logo" width={width} height={height} style={{ objectFit: "contain" }} />;
@@ -34,7 +65,6 @@ function Toast({ message, type }: { message: string; type: "success" | "error" }
     );
 }
 
-// Password strength checker
 function PasswordStrength({ password }: { password: string }) {
     const checks = [
         { label: "8+ characters", ok: password.length >= 8 },
@@ -56,14 +86,14 @@ function PasswordStrength({ password }: { password: string }) {
                 ))}
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <span style={{ fontSize:11, color: score > 0 ? colors[score-1] : "rgba(255,255,255,0.3)" }}>
-          {score > 0 ? labels[score-1] : ""}
-        </span>
+                <span style={{ fontSize:11, color: score > 0 ? colors[score-1] : "rgba(255,255,255,0.3)" }}>
+                    {score > 0 ? labels[score-1] : ""}
+                </span>
                 <div style={{ display:"flex", gap:12 }}>
                     {checks.map(c => (
                         <span key={c.label} style={{ fontSize:10, color: c.ok ? "#22c55e" : "rgba(255,255,255,0.25)", display:"flex", alignItems:"center", gap:3 }}>
-              {c.ok ? "✓" : "○"} {c.label}
-            </span>
+                            {c.ok ? "?" : "?"} {c.label}
+                        </span>
                     ))}
                 </div>
             </div>
@@ -71,16 +101,17 @@ function PasswordStrength({ password }: { password: string }) {
     );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function RegisterPage() {
-    const [email, setEmail]           = useState("");
-    const [password, setPassword]     = useState("");
-    const [confirmPass, setConfirmPass] = useState("");
-    const [role, setRole]             = useState<"student"|"teacher"|"staff">("student");
-    const [showPass, setShowPass]     = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [loading, setLoading]       = useState(false);
-    const [toast, setToast]           = useState<{ message: string; type: "success"|"error" } | null>(null);
-    const [errors, setErrors]         = useState<Record<string,string>>({});
+    const [email, setEmail]               = useState("");
+    const [password, setPassword]         = useState("");
+    const [confirmPass, setConfirmPass]   = useState("");
+    const [role, setRole]                 = useState<Role>("student");
+    const [showPass, setShowPass]         = useState(false);
+    const [showConfirm, setShowConfirm]   = useState(false);
+    const [toast, setToast]               = useState<{ message: string; type: "success"|"error" } | null>(null);
+    const [errors, setErrors]             = useState<Record<string,string>>({});
 
     const showToast = (message: string, type: "success"|"error") => {
         setToast({ message, type });
@@ -99,29 +130,28 @@ export default function RegisterPage() {
         return Object.keys(e).length === 0;
     };
 
-    const handleSubmit = async (ev: React.FormEvent) => {
-        ev.preventDefault();
-        if (!validate()) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`${BASE_URL}${API_VERSION}/auth/create_users/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, role }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                const msg = data?.email?.[0] || data?.password?.[0] || data?.detail || "Registration failed. Please try again.";
-                showToast(msg, "error");
-                return;
-            }
+    // ── TanStack mutation ──────────────────────────────────────────────────────
+    const { mutate, isPending } = useMutation<RegisterResponse, AxiosError<RegisterResponse>, RegisterPayload>({
+        mutationFn: registerUser,
+        onSuccess: () => {
             showToast("Account created successfully! Please Check Email For Verification...", "success");
             // setTimeout(() => { window.location.href = "/login"; }, 2000);
-        } catch {
-            showToast("Unable to connect to server. Please try again.", "error");
-        } finally {
-            setLoading(false);
-        }
+        },
+        onError: (error) => {
+            const data = error.response?.data;
+            const msg =
+                data?.email?.[0] ??
+                data?.password?.[0] ??
+                data?.detail ??
+                "Registration failed. Please try again.";
+            showToast(msg, "error");
+        },
+    });
+
+    const handleSubmit = (ev: React.FormEvent) => {
+        ev.preventDefault();
+        if (!validate()) return;
+        mutate({ email, password, role });
     };
 
     const clearError = (field: string) => setErrors(p => { const n = { ...p }; delete n[field]; return n; });
@@ -325,19 +355,19 @@ export default function RegisterPage() {
                                     {/* Match indicator */}
                                     {confirmPass && password && (
                                         <p style={{ fontSize:12, marginTop:6, color: password === confirmPass ? "#22c55e" : "#f87171", display:"flex", alignItems:"center", gap:4 }}>
-                                            {password === confirmPass ? "✓ Passwords match" : "✗ Passwords do not match"}
+                                            {password === confirmPass ? "? Passwords match" : "? Passwords do not match"}
                                         </p>
                                     )}
                                 </div>
 
                                 {/* Submit */}
-                                <button type="submit" disabled={loading} className="submit-btn"
+                                <button type="submit" disabled={isPending} className="submit-btn"
                                         style={{ background:"linear-gradient(135deg,#e2b23e,#b8860b)", color:"#06152e", marginTop:8 }}>
-                                    {loading
+                                    {isPending
                                         ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:10 }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation:"spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                        Creating account…
-                      </span>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation:"spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                            Creating account…
+                                          </span>
                                         : "Create Account"
                                     }
                                 </button>
